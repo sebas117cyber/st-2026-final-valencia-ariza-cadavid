@@ -11,7 +11,7 @@ Hurtos_ANT <- read_csv("base_data/Reporte_Hurto_de_motocicletas_y_automotores_en
 
 # Procesar las fechas y agrupar por mes
 
-# serie general Antioquia
+#----serie general Antioquia----
 
 df_mensual_antioqua <- Hurtos_ANT |> 
   rename(T_hurto = `TIPO DE HURTO`) |> 
@@ -29,7 +29,7 @@ anio_inicio <- as.numeric(format(min(df_mensual_antioqua$fecha), "%Y"))
 mes_inicio  <- as.numeric(format(min(df_mensual_antioqua$fecha), "%m"))
 
 
-## serie antioquia
+## serie ts
 
 serie_ts_ant <- ts(
   df_mensual_antioqua$valor,
@@ -46,7 +46,7 @@ serie_ant <- leer_serie(
 )
 
 
-
+graficar_serie(serie_ant, "Robos registrado en Antioquia ")
 
 #----- Serie medellin----
 df_mensual_med <- Hurtos_ANT |> 
@@ -64,7 +64,7 @@ anio_inicio <- as.numeric(format(min(df_mensual_med$fecha), "%Y"))
 mes_inicio  <- as.numeric(format(min(df_mensual_med$fecha), "%m"))
 
 
-## serie antioquia
+# serie ts
 
 serie_ts_med <- ts(
   df_mensual_med$valor,
@@ -74,16 +74,16 @@ serie_ts_med <- ts(
 
 
 
-serie_ant <- leer_serie(
-  x = serie_ts_ant,
+serie_med <- leer_serie(
+  x = serie_ts_med,
   fuente = "datos abiertos col",
   unidad = "robos reportados de vehiculos"
 )
 
+graficar_serie(serie_med, "Robos registrado en Medellin ")
 
 
-
-# serie Rionegro
+#----serie Rionegro----
 
 df_mensual_Rio <- Hurtos_ANT |> 
   rename(T_hurto = `TIPO DE HURTO`) |> 
@@ -95,6 +95,31 @@ df_mensual_Rio <- Hurtos_ANT |>
   group_by(fecha) |> 
   summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |> 
   arrange(fecha)
+
+
+anio_inicio <- as.numeric(format(min(df_mensual_Rio$fecha), "%Y"))
+mes_inicio  <- as.numeric(format(min(df_mensual_Rio$fecha), "%m"))
+
+
+# serie ts
+
+serie_ts_Rio <- ts(
+  df_mensual_Rio$valor,
+  start = c(anio_inicio, mes_inicio),
+  frequency = 12
+)
+
+
+
+serie_Rio <- leer_serie(
+  x = serie_ts_Rio,
+  fuente = "datos abiertos col",
+  unidad = "robos reportados de vehiculos"
+)
+
+
+graficar_serie(serie_Rio, "Robos registrado en Rionegro ")
+
 
 
 
@@ -112,6 +137,29 @@ df_mensual_Envi <- Hurtos_ANT |>
   summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |> 
   arrange(fecha)
 
+anio_inicio <- as.numeric(format(min(df_mensual_Envi$fecha), "%Y"))
+mes_inicio  <- as.numeric(format(min(df_mensual_Envi$fecha), "%m"))
+
+
+# serie ts
+
+serie_ts_Envi <- ts(
+  df_mensual_Envi$valor,
+  start = c(anio_inicio, mes_inicio),
+  frequency = 12
+)
+
+
+
+serie_Envi <- leer_serie(
+  x = serie_ts_Envi,
+  fuente = "datos abiertos col",
+  unidad = "robos reportados de vehiculos"
+)
+
+
+
+graficar_serie(serie_Envi, "Robos registrado en Envigado ")
 
 
 remove(Hurtos_ANT, df_mensual, anio_inicio, mes_inicio, serie_ts)
