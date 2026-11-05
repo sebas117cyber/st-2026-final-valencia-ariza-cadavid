@@ -45,8 +45,8 @@ serie_ant <- leer_serie(
   unidad = "robos reportados de vehiculos"
 )
 
-
-graficar_serie(serie_ant, "Robos registrado en Antioquia ")
+# Grafico
+graficar_serie(serie_ant, "Robos registrados en Antioquia ")
 
 #----- Serie medellin----
 df_mensual_med <- Hurtos_ANT |> 
@@ -80,7 +80,7 @@ serie_med <- leer_serie(
   unidad = "robos reportados de vehiculos"
 )
 
-graficar_serie(serie_med, "Robos registrado en Medellin ")
+graficar_serie(serie_med, "Robos registrados en Medellin ")
 
 
 #----serie Rionegro----
@@ -118,7 +118,7 @@ serie_Rio <- leer_serie(
 )
 
 
-graficar_serie(serie_Rio, "Robos registrado en Rionegro ")
+graficar_serie(serie_Rio, "Robos registrados en Rionegro ")
 
 
 
