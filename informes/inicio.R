@@ -3,7 +3,7 @@
 library(readr)
 library(lubridate)
 library(tidyverse)
-
+library(plotly)
 
 Hurtos_ANT <- read_csv("base_data/Reporte_Hurto_de_motocicletas_y_automotores_en_el_Departamento_de_Antioquia_-_Policía_Nacional_20260930.csv"
 )
@@ -80,7 +80,54 @@ serie_med <- leer_serie(
   unidad = "robos reportados de vehiculos"
 )
 
-graficar_serie(serie_med, "Robos registrados en Medellin ")
+g1 <- graficar_serie(serie_med, "Robos registrados en Medellin ")
+g_co <- correlograma(serie_med)
+
+library(forecast); library(ggplot2); library(patchwork)
+
+# Tranformaciones
+
+
+lambda <- BoxCox.lambda(serie_ts_med, method = "guerrero")
+serie_trans <- BoxCox(serie_ts_med, lambda = lambda)
+
+vector_ <- as.vector(serie_trans)
+datos_trans <- data.frame(fecha = df_mensual_med$fecha, valor_trans = vector_)
+
+g2 <- ggplot(datos_trans, aes(x = fecha, y = valor_trans)) +
+  geom_line(color = "darkslategray", linewidth = 0.75) +
+  labs(title = "Serie medellin Tranformada box-cox", x = "Fecha", y = "Valor") +
+  theme_minimal()
+
+# Antes vs. Despues de tranformar
+g1 + g2
+
+
+# 2. Tener media estacionaria:
+
+d <- ndiffs(serie_trans)
+w <- diff(serie_trans, differences = d)
+vector_w <- as.vector(w)
+datos_trans2 <- data.frame(fecha = df_mensual_med$fecha[2:199], valor_trans2 = vector_w)
+g3 <- ggplot(datos_trans2, aes(x = fecha, y = valor_trans2)) +
+  geom_line(color = "darkslategray", linewidth = 0.75) +
+  labs(title = "Serie medellin diferenciada", x = "Fecha", y = "Valor") +
+  theme_minimal()
+
+# Paso a paso de ir aplicando las dos tranformaciones:
+g1 + g2 + g3
+
+par(mfrow = c(1,2))
+acf(w, main = "ACF")
+pacf(w, main = "PACF")
+
+w_estacional <- diff(w, lag = 12)
+
+par(mfrow = c(1,2))
+acf(as.numeric(w), main = "ACF")
+pacf(as.numeric(w), main = "PACF")
+
+
 
 
 #----serie Rionegro----
