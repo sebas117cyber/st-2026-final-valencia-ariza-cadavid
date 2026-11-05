@@ -162,9 +162,10 @@ serie_Envi <- leer_serie(
 graficar_serie(serie_Envi, "Robos registrado en Envigado ")
 
 
-remove(Hurtos_ANT, df_mensual, anio_inicio, mes_inicio, serie_ts)
+remove(Hurtos_ANT, df_mensual_Rio, df_mensual_med, df_mensual_Envi, df_mensual_antioqua, 
+       anio_inicio, mes_inicio, serie_ts_ant, serie_ts_Rio, serie_ts_med, serie_ts_Envi)
 
-graficar_serie(serie_final, "Robos Antioquia medellin")
+
 
 
 
