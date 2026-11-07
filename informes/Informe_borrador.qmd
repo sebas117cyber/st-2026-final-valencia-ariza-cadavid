@@ -1,0 +1,136 @@
+---
+title: "Trabajo Final informe"
+subtitle: "Series de Tiempo — Pregrado en Estadística, UNAL Medellín"
+author: "Sebastian Valencia Botero ; Andres Felipe Cadavid Sanguino ; Julián Esteban Ariza Caro"
+date: today
+format:
+  pdf:
+    number-sections: true
+    toc: true
+    fig-width: 6
+    fig-height: 4
+    geometry:
+      - a4paper
+      - margin=1.5cm
+      - landscape
+    include-in-header:
+      text: |
+        \usepackage{tabularx}
+        \usepackage{xcolor}
+        \usepackage{array}
+        \usepackage{graphicx}
+bibliography: referencias.bib
+editor: visual
+execute: 
+  echo: false
+---
+
+```{r, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(tibble)
+library(ggplot2)
+library(kableExtra)
+library(forecast)
+library(patchwork)
+
+```
+
+
+
+Universidad Nacional de Colombia, sede Medellín · Departamento de Estadística \| Noviembre de 2026\
+Series de tiempo univariadas, 2026-II · Prof. Juan Pablo Valencia Arango \| Trabajo final
+
+------------------------------------------------------------------------
+
+# Pronóstico del hurto mensual de automóviles en Antioquia para la tarifa del seguro de hurto {.unnumbered}
+
+Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valencia Botero
+
+# Tema
+
+La serie es el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Antioquia, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos (Policía Nacional de Colombia, 2026); la serie mensual se obtiene con código en R contando los registros de cada mes. El conjunto cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal.
+
+El nivel cambia por tramos: cerca de 200 hurtos por mes en 2011–2013, entre 110 y 130 en 2014–2021, alrededor de 150 en 2022–2024 y 123 en 2025. Hay atípicos y posibles cambios de nivel que se tratarán como intervenciones: noviembre y diciembre de 2012 (72 y 102 hurtos, con una caída que sugiere un problema de registro), la caída de 2014, la integración de los registros de la Policía y la Fiscalía y la denuncia virtual en 2017, que según @rodriguez2018 restaron comparabilidad a la serie, y abril de 2020 (34 hurtos, por el aislamiento obligatorio). La estacionalidad es débil: entre 2014 y 2019 el índice mensual va de 0,90 en diciembre a 1,06 en noviembre.
+
+# Usuario y Practica vigente
+
+El usuario es el área actuarial de una aseguradora de automóviles, y su decisión es la tarifa de la cobertura de hurto en la renovación anual de las pólizas. La prima de riesgo de esa cobertura depende de la frecuencia esperada de hurto durante el año de vigencia, de modo que el pronóstico de uno a los doce meses siguientes informa la prima y el presupuesto de siniestros. Si la frecuencia se subestima, la prima resulta insuficiente y la cartera pierde dinero; si se sobreestima, la prima pierde competitividad y equidad. La ley exige que las tarifas cumplan los principios de equidad y suficiencia y se basen en información estadística homogénea y representativa (Presidencia de la República de Colombia, 1993, art. 184).
+
+La práctica actuarial documentada proyecta la frecuencia al periodo de vigencia ajustando una tendencia lineal o exponencial a la historia; en líneas de cola corta, como los daños a automóviles, se usan totales de doce meses móviles para suavizar la estacionalidad (Werner & Modlin, 2016, cap. 6).
+
+El pronóstico se entrega al área actuarial como un factor de tendencia: el total de hurtos pronosticado para los doce meses siguientes dividido entre el total observado en los doce meses anteriores. Ese factor, con su intervalo, se aplica a la frecuencia de hurto de la propia cartera, que es el papel que hoy cumple la tendencia lineal. La serie abarca quince años y registra entre 120 y 150 hurtos al mes, mientras que la experiencia de una sola aseguradora es una fracción de esos casos y la precisión de los pronósticos de delitos depende sobre todo del nivel de los conteos [@gorr2002].
+
+# Sobre el resultado
+
+Si la respuesta es afirmativa, el área actuarial puede reemplazar el factor de tendencia lineal por el factor que se obtiene del SARIMA. Si es negativa, el área actuarial conserva la tendencia lineal o, si la validación muestra que el naive estacional o Holt–Winters la superan, adopta ese método más simple.
+
+# Pregunta de investigacion
+
+*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico de 1 - 12 meses siguientes de hurtos de automóviles denunciados en Antioquia, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre uno a doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
+
+La métrica que decide la respuesta es el MASE de los errores de los pronosticos de uno a doce meses, porque esa es la cantidad que entra en la tarifa como factor de tendencia. Se calcula lo mismo en la muestra de entrenamiento, del naive estacional de los doce meses anteriores. se utiliza el MASE porque a diferencia del MAPE, no se indefine con valores cercanos a cero ni trata de forma asimétrica los errores por exceso y por defecto (Hyndman & Koehler, 2006).
+
+**Criterio de respuesta**. Diremos que el SARIMA mejora el pronóstico si su MASE del total de doce meses, promediado sobre los numero orígenes de la validación, es menor que el de cada uno de los tres referentes y si la prueba de Diebold y Mariano con la corrección de Harvey, Leybourne y Newbold, aplicada a los errores absolutos del total con una varianza robusta al solapamiento de los horizontes, rechaza al 5 % la igualdad de precisión frente a cada referente. En otro caso la respuesta es negativa y se reporta así, sin cambiar de modelo.
+
+# Objetivo general
+
+Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del total de doce meses de hurtos de automóviles denunciados en Antioquia frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles, mediante validación de origen móvil sobre la serie mensual de enero de 2010 a diciembre de 2025.
+
+# Objetivos específicos
+
+1.  Caracterizar la tendencia, la estacionalidad, los atípicos y los cambios de nivel de la serie mensual. Producto: descomposición STL, índices estacionales y tabla de atípicos e intervenciones.
+2.  Determinar la transformación y el orden de integración regular y estacional. Producto: $\lambda$ de Box y Cox estimado en entrenamiento y tabla de las pruebas ADF, PP, KPSS y de raíz estacional.
+3.  Estimar por máxima verosimilitud y diagnosticar los SARIMA candidatos. Producto: tabla de coeficientes con errores estándar, criterios de información y diagnóstico de residuos.
+4.  Comparar la precisión del SARIMA con la de los tres referentes en origen móvil, con entrenamiento inicial de enero de 2010 a diciembre de 2020 y numero orígenes, de diciembre de 2020 a diciembre de 2025. Producto: MASE del total y error del factor de tendencia, MASE y RMSE por horizonte, cobertura empírica al 80 y al 95 %, Diebold y Mariano frente a cada referente, Clark y West para la covariable y veredicto.
+5.  Implementar el pronóstico en una herramienta que el área actuarial pueda consultar sin asistencia. Producto: aplicación Shiny que recibe la fecha de corte y el horizonte y devuelve el pronóstico mensual, el total de doce meses y el factor de tendencia con sus intervalos, e informe Quarto parametrizado.
+
+# Revisión de literatura
+
+## Búsqueda y criterios
+
+La búsqueda se hizo en Google Scholar, SciELO, Redalyc, la biblioteca del National Criminal Justice Reference Service, CrimRxiv, arXiv y los repositorios de EAFIT, la Universidad Tecnológica de Pereira y la Universidad Nacional, con la cadena («crime» OR «theft» OR «robbery» OR «hurto» OR «robo») AND («forecast*» OR «pronóstic*» OR «time series» OR «ARIMA» OR «SARIMA» OR «exponential smoothing»), y se completó rastreando las citas de las fuentes centrales.
+
+Se incluyen trabajos publicados desde 2000 que pronostican conteos de delitos con métodos de series de tiempo o de aprendizaje automático y reportan al menos una medida cuantitativa de error o de ajuste, con texto completo de acceso libre, para que cualquier lector pueda verificarlos. Se incluyen además dos fuentes colombianas que no pronostican pero fundamentan decisiones del diseño: la frecuencia del hurto de vehículos asegurados y el cambio de registro de 2017. Se excluyen los trabajos descriptivos sin medida de error, los que pronostican series anuales nacionales y los que no tienen texto completo de acceso libre. Quedan nueve fuentes, seis de ellas arbitradas o documentos institucionales.
+
+## Lectura de las fuentes
+
+Los dos informes del grupo de Gorr para el Instituto Nacional de Justicia de Estados Unidos son la evidencia más directa sobre pronóstico mensual de delitos con validación de origen móvil. @gorr2002 pronostican a un mes delitos por precinto en Pittsburgh: el suavizamiento de Holt con estacionalidad estimada para toda la ciudad fue el mejor método, el naive del mismo mes del año anterior tuvo errores en promedio un 37 % mayores, y con 30 o más delitos al mes el MAPE ronda el 20 %. @cohen2005 amplían el diseño a Pittsburgh y Rochester con quince métodos y confirman que el suavizamiento exponencial con estacionalidad agrupada es el mejor en promedio, mientras que los modelos de indicadores líderes solo ganan al anticipar cambios grandes.
+
+@ashby2023 compara diez métodos en doce ciudades con 48 orígenes móviles y encuentra que la combinación de ETS, modelo lineal, naive estacional y STL supera al naive a horizontes largos. @ashby2020 es la única fuente que modela el robo de vehículos con SARIMA, pero lo usa como contrafactual de 2020 y reporta el MASE dentro de muestra. @hahn2023 ajusta SARIMA a conteos mensuales con una sola partición de prueba, y @guerra2024 elige automáticamente entre suavizamiento y SARIMA para el hurto a personas en Medellín. @perez2025 muestran que, con conteos semanales pequeños por comuna, las redes recurrentes reducen el RMSE medio frente a ARIMA, sin prueba formal de la diferencia.
+
+En el dominio colombiano, @medina2017 modelan la frecuencia mensual del hurto de vehículos asegurados con una binomial negativa y la proyectan sin validación fuera de muestra, y @rodriguez2018 documentan que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual, desde 2017, aumentaron las cifras registradas sin que necesariamente aumentara el delito.
+
+La referencia @personeria2015 explica que impacto tuvieron politicas y estrategias publicas de seguridad en la ciudad de medellin en los años 2011 a 2015 donde se identifico que hay cambios sustanciales en la dinamica de hurtos de automotores en la ciudad disminuyendo por practicas como el aumento sustancial del pie de fuerza y cuadrantes o la renovacion de infrastructura
+
+La tabla 1 resume las nueve fuentes. La literatura también da una referencia para calibrar el resultado propio: a un mes, el MAPE de los conteos mensuales de delitos ronda el 20 % en unidades con unos 30 delitos al mes [@gorr2002], el menor MAPE de los delitos contra la propiedad por precinto es de 9,4 a 10,5 % [@cohen2005], y a nivel de ciudad el error ponderado de la mejor combinación es del 6,6 % [@ashby2023]. La serie de Antioquia, con 120 a 150 hurtos al mes, está en el rango de conteos en que esos errores se obtuvieron, aunque las métricas no son directamente comparables con el MASE.
+
+## Brecha
+
+La literatura revisada establece que, a un mes, los métodos con modelo superan a los ingenuos en el pronóstico mensual de delitos, que el suavizamiento exponencial con estacionalidad es el referente más difícil de superar y que la precisión depende sobre todo del nivel de los conteos [@gorr2002; @cohen2005; @ashby2023]. No resuelve, en cambio, tres cosas que importan para la tarifa. Ninguna fuente pronostica el hurto de automóviles fuera de muestra como serie principal: @ashby2020 lo modela, pero solo como contrafactual y con un error dentro de muestra. Ninguna compara contra la tendencia lineal sobre totales de doce meses que usa la tarificación ni evalúa el total anual que entra en la prima. Y la evaluación es débil en las tres piezas que este curso exige: solo tres fuentes usan origen móvil, ninguna usa el MASE fuera de muestra ni la prueba de Diebold y Mariano, y solo @hahn2023 revisa si los valores observados caen en los intervalos, sobre seis meses. Este trabajo se ubica en ese vacío: mantiene el SARIMA y el suavizamiento exponencial, sobre los que hay consenso, y concentra el aporte en evaluarlos contra el referente de la decisión actuarial, a horizontes de 1 a 12 meses y en el total anual, con MASE, Diebold y Mariano, cobertura empírica y el tratamiento explícito del cambio de registro documentado por @rodriguez2018.
+
+## Tabla 1: Comparación de las fuentes revisadas
+
+| Fuente (tipo) | Datos | Método | Horizonte | Métrica | Resultado reportado |
+|:-----------|:-----------|:-----------|:-----------|:-----------|:-----------|
+| @gorr2002 (informe institucional) | Pittsburgh, 6 precintos y 141 celdas; agresiones, robos, allanamientos; mensual, 1990--1998 | Naive, naive del año anterior, suavizamiento simple y de Holt con estacionalidad por precinto o agrupada; regresión y red neuronal | 1 mes; 36 pronósticos en origen móvil, 1996--1998 | MAPE; pruebas t pareadas | Holt con estacionalidad agrupada es el mejor; naive del año anterior con errores un 37 % mayores; MAPE cercano al 20 % con 30 o más delitos al mes |
+| @cohen2005 (informe institucional) | Pittsburgh 1990--2001 y Rochester 1991--2001; delitos contra la propiedad y violentos; mensual; precintos a sectores censales | 15 métodos: naive, suavizamiento exponencial con estacionalidad agrupada, indicadores líderes, redes neuronales | 1 mes; origen móvil, 1995--2001 | MAPE y MSE | Suavizamiento con estacionalidad agrupada por ciudad, el mejor; menor MAPE de delitos contra la propiedad por precinto 9,4 % (Pittsburgh) y 10,5 % (Rochester) |
+| @ashby2023 (preprint) | 12 ciudades de EE. UU., delitos registrados, mensual y diario, 2010--2019 | 10 métodos: naive, naive estacional, STL, ETS, lineal, ARIMA, red neuronal, Prophet, FASSTER y combinación | 36 meses, 90 días y 12 meses; 48 orígenes móviles, entrenamiento de 3 años | WAPE | Combinación 6,6 % frente a naive 10,0 % a 36 meses; 20,4 % a 12 meses por distrito |
+| @ashby2020 (arbitrada) | 16 ciudades de EE. UU., seis delitos incluido el robo de vehículos; semanal, 2016--2020 | SARIMA seleccionado por AIC, como contrafactual de 2020 | Semanas de 2020, intervalos al 99 % | MASE dentro de muestra frente al naive de la semana anterior | Robo de vehículos: MASE entre 0,41 y 0,58 en 13 ciudades; no reporta error fuera de muestra |
+| @hahn2023 (preprint) | California, agresiones agravadas por tipo de arma; mensual, 2005--2019 | SARIMA sobre logaritmos | 6 meses; una partición final | Error relativo mensual; intervalos al 90 % | Errores dentro del 10 %, la mayoría bajo el 5 % |
+| @perez2025 (arbitrada) | Bucaramanga, 17 comunas, hurtos; semanal, 2016--2022 | ARIMA, red recurrente y LSTM | Unas 10 semanas de prueba | RMSE; SMAPE | RMSE medio: LSTM 2,88, red recurrente 3,10, ARIMA 3,43; sin prueba de significancia |
+| @guerra2024 (tesis de maestría) | Medellín, hurto a personas por ciudad, comuna y barrio; mensual, 2017--2024 | Competencia automática entre suavizamiento exponencial, ARIMA y SARIMA | 3 meses | R^2^, MAE, MAPE | A nivel de ciudad gana Winters aditivo, con MAPE cercano al 7 % |
+| @medina2017 (arbitrada) | Colombia, hurto de vehículos asegurados, datos de Fasecolda 2006--2012 | Binomial negativa para la frecuencia mensual, severidad continua, Montecarlo | Un mes | VaR al 95 % | Bogotá y Medellín con la mayor pérdida esperada; sin validación fuera de muestra |
+| @rodriguez2018 (arbitrada, institucional) | Colombia, registros SIEDCO y SPOA y denuncia virtual | Comparación de registros con fuentes alternativas | No reporta | No reporta | La integración de 2017 aumentó las cifras registradas sin que necesariamente aumentara el delito |
+
+
+# Marco Teorico
+
+
+# Referencias
+
+::: {#refs}
+:::

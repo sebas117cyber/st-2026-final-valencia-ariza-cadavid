@@ -251,6 +251,44 @@ remove(Hurtos_ANT, df_mensual_Rio, df_mensual_med, df_mensual_Envi, df_mensual_a
        df_mensual_Bello, anio_inicio, mes_inicio, serie_ts_ant, serie_ts_Rio, serie_ts_med, serie_ts_Envi)
 
 
+#---- Valle de aburra----
 
-
-
+# df_mensual_Bello <- Hurtos_ANT |> 
+#   rename(T_hurto = `TIPO DE HURTO`) |> 
+#   filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES" & MUNICIPIO == "Bello") |> 
+#   mutate(
+#     fecha_dt = dmy(`FECHA HECHO`), 
+#     fecha = floor_date(fecha_dt, unit = "month")
+#   ) |> 
+#   group_by(fecha) |> 
+#   summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |> 
+#   arrange(fecha)
+# 
+# anio_inicio <- as.numeric(format(min(df_mensual_Bello$fecha), "%Y"))
+# mes_inicio  <- as.numeric(format(min(df_mensual_Bello$fecha), "%m"))
+# 
+# 
+# # serie ts
+# 
+# serie_ts_Bello <- ts(
+#   df_mensual_Bello$valor,
+#   start = c(anio_inicio, mes_inicio),
+#   frequency = 12
+# )
+# 
+# 
+# 
+# serie_Bello <- leer_serie(
+#   x = serie_ts_Bello,
+#   fuente = "datos abiertos col",
+#   unidad = "robos reportados de vehiculos"
+# )
+# 
+# 
+# 
+# graficar_serie(serie_Bello, "Robos registrado en Bello ")
+# 
+# 
+# 
+# 
+# 
