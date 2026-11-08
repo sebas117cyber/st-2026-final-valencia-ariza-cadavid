@@ -253,42 +253,43 @@ remove(Hurtos_ANT, df_mensual_Rio, df_mensual_med, df_mensual_Envi, df_mensual_a
 
 #---- Valle de aburra----
 
-# df_mensual_Bello <- Hurtos_ANT |> 
-#   rename(T_hurto = `TIPO DE HURTO`) |> 
-#   filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES" & MUNICIPIO == "Bello") |> 
-#   mutate(
-#     fecha_dt = dmy(`FECHA HECHO`), 
-#     fecha = floor_date(fecha_dt, unit = "month")
-#   ) |> 
-#   group_by(fecha) |> 
-#   summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |> 
-#   arrange(fecha)
-# 
-# anio_inicio <- as.numeric(format(min(df_mensual_Bello$fecha), "%Y"))
-# mes_inicio  <- as.numeric(format(min(df_mensual_Bello$fecha), "%m"))
-# 
-# 
-# # serie ts
-# 
-# serie_ts_Bello <- ts(
-#   df_mensual_Bello$valor,
-#   start = c(anio_inicio, mes_inicio),
-#   frequency = 12
-# )
-# 
-# 
-# 
-# serie_Bello <- leer_serie(
-#   x = serie_ts_Bello,
-#   fuente = "datos abiertos col",
-#   unidad = "robos reportados de vehiculos"
-# )
-# 
-# 
-# 
-# graficar_serie(serie_Bello, "Robos registrado en Bello ")
-# 
-# 
-# 
-# 
-# 
+df_mensual_Valle <- Hurtos_ANT |>
+  rename(T_hurto = `TIPO DE HURTO`) |>
+  filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES" & MUNICIPIO == "Bello"
+         & MUNICIPIO == "Medellín (CT)") |>
+  mutate(
+    fecha_dt = dmy(`FECHA HECHO`),
+    fecha = floor_date(fecha_dt, unit = "month")
+  ) |>
+  group_by(fecha) |>
+  summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |>
+  arrange(fecha)
+
+anio_inicio <- as.numeric(format(min(df_mensual_Valle$fecha), "%Y"))
+mes_inicio  <- as.numeric(format(min(df_mensual_Valle$fecha), "%m"))
+
+
+# serie ts
+
+serie_ts_Valle <- ts(
+  df_mensual_Valle$valor,
+  start = c(anio_inicio, mes_inicio),
+  frequency = 12
+)
+
+
+
+serie_Valle <- leer_serie(
+  x = serie_ts_Valle,
+  fuente = "datos abiertos col",
+  unidad = "robos reportados de vehiculos"
+)
+
+
+
+graficar_serie(serie_Valle, "Robos de autos registrados en Valle de Aburra ")
+
+
+
+
+

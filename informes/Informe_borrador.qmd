@@ -52,9 +52,12 @@ Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valen
 
 # Tema
 
-La serie es el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Antioquia, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos (Policía Nacional de Colombia, 2026); la serie mensual se obtiene con código en R contando los registros de cada mes. El conjunto cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal.
+La serie es muestra el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Antioquia, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos (Policía Nacional de Colombia, 2026); la serie es mensual, se obtiene con código en R contando los registros de cada mes. El conjunto cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal.
 
-El nivel cambia por tramos: cerca de 200 hurtos por mes en 2011–2013, entre 110 y 130 en 2014–2021, alrededor de 150 en 2022–2024 y 123 en 2025. Hay atípicos y posibles cambios de nivel que se tratarán como intervenciones: noviembre y diciembre de 2012 (72 y 102 hurtos, con una caída que sugiere un problema de registro), la caída de 2014, la integración de los registros de la Policía y la Fiscalía y la denuncia virtual en 2017, que según @rodriguez2018 restaron comparabilidad a la serie, y abril de 2020 (34 hurtos, por el aislamiento obligatorio). La estacionalidad es débil: entre 2014 y 2019 el índice mensual va de 0,90 en diciembre a 1,06 en noviembre.
+El nivel cambia por tramos: cerca de 200 hurtos por mes en 2011–2013, entre 110 y 130 en 2014–2021, alrededor de 150 en 2022–2024 y 123 en 2025. Hay datos atípicos presentes en los años 2012 y 2020 donde se reducen los hurtos, ademas hay posibles cambios de nivel que se tratarán como intervenciones: noviembre y diciembre de 2012 (72 y 102 hurtos, con una caída que sugiere un problema de registro), la caída de 2014, la integración de los registros de la Policía y la Fiscalía y la denuncia virtual en 2017, que según @rodriguez2018 restaron comparabilidad a la serie, y abril de 2020 (34 hurtos, por el aislamiento obligatorio). La estacionalidad es débil: entre 2014 y 2019 el índice mensual va de 0,90 en diciembre a 1,06 en noviembre.
+
+
+Al explorar la base de datos, se observa que la mayoría de los hurtos de automotores ocurren en el Valle de Aburrá, especialmente en Medellín, donde se concentra alrededor del $66 \%$ de los casos. Por esta razón, se decide pronosticar el número de hurtos en esta ciudad.
 
 # Usuario y Practica vigente
 
@@ -70,7 +73,7 @@ Si la respuesta es afirmativa, el área actuarial puede reemplazar el factor de 
 
 # Pregunta de investigacion
 
-*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico de 1 - 12 meses siguientes de hurtos de automóviles denunciados en Antioquia, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre uno a doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
+*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico de 1 - 12 meses siguientes de hurtos de automóviles denunciados en Medellín, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre uno a doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
 
 La métrica que decide la respuesta es el MASE de los errores de los pronosticos de uno a doce meses, porque esa es la cantidad que entra en la tarifa como factor de tendencia. Se calcula lo mismo en la muestra de entrenamiento, del naive estacional de los doce meses anteriores. se utiliza el MASE porque a diferencia del MAPE, no se indefine con valores cercanos a cero ni trata de forma asimétrica los errores por exceso y por defecto (Hyndman & Koehler, 2006).
 
@@ -83,9 +86,13 @@ Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del to
 # Objetivos específicos
 
 1.  Caracterizar la tendencia, la estacionalidad, los atípicos y los cambios de nivel de la serie mensual. Producto: descomposición STL, índices estacionales y tabla de atípicos e intervenciones.
+
 2.  Determinar la transformación y el orden de integración regular y estacional. Producto: $\lambda$ de Box y Cox estimado en entrenamiento y tabla de las pruebas ADF, PP, KPSS y de raíz estacional.
+
 3.  Estimar por máxima verosimilitud y diagnosticar los SARIMA candidatos. Producto: tabla de coeficientes con errores estándar, criterios de información y diagnóstico de residuos.
+
 4.  Comparar la precisión del SARIMA con la de los tres referentes en origen móvil, con entrenamiento inicial de enero de 2010 a diciembre de 2020 y numero orígenes, de diciembre de 2020 a diciembre de 2025. Producto: MASE del total y error del factor de tendencia, MASE y RMSE por horizonte, cobertura empírica al 80 y al 95 %, Diebold y Mariano frente a cada referente, Clark y West para la covariable y veredicto.
+
 5.  Implementar el pronóstico en una herramienta que el área actuarial pueda consultar sin asistencia. Producto: aplicación Shiny que recibe la fecha de corte y el horizonte y devuelve el pronóstico mensual, el total de doce meses y el factor de tendencia con sus intervalos, e informe Quarto parametrizado.
 
 # Revisión de literatura
@@ -104,7 +111,7 @@ Los dos informes del grupo de Gorr para el Instituto Nacional de Justicia de Est
 
 En el dominio colombiano, @medina2017 modelan la frecuencia mensual del hurto de vehículos asegurados con una binomial negativa y la proyectan sin validación fuera de muestra, y @rodriguez2018 documentan que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual, desde 2017, aumentaron las cifras registradas sin que necesariamente aumentara el delito.
 
-La referencia @personeria2015 explica que impacto tuvieron politicas y estrategias publicas de seguridad en la ciudad de medellin en los años 2011 a 2015 donde se identifico que hay cambios sustanciales en la dinamica de hurtos de automotores en la ciudad disminuyendo por practicas como el aumento sustancial del pie de fuerza y cuadrantes o la renovacion de infrastructura
+La referencia @personeria2015 analiza el impacto de las políticas y estrategias públicas de seguridad implementadas en Medellín entre 2011 y 2015. En ese periodo, se identificaron cambios sustanciales en la dinámica de los hurtos de automotores, cuya disminución se relacionó con medidas como el aumento del pie de fuerza, la implementación de cuadrantes y la renovación de la infraestructura.
 
 La tabla 1 resume las nueve fuentes. La literatura también da una referencia para calibrar el resultado propio: a un mes, el MAPE de los conteos mensuales de delitos ronda el 20 % en unidades con unos 30 delitos al mes [@gorr2002], el menor MAPE de los delitos contra la propiedad por precinto es de 9,4 a 10,5 % [@cohen2005], y a nivel de ciudad el error ponderado de la mejor combinación es del 6,6 % [@ashby2023]. La serie de Antioquia, con 120 a 150 hurtos al mes, está en el rango de conteos en que esos errores se obtuvieron, aunque las métricas no son directamente comparables con el MASE.
 
