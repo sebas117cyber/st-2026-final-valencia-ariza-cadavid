@@ -3,7 +3,15 @@ title: "Trabajo Final informe"
 subtitle: "Series de Tiempo — Pregrado en Estadística, UNAL Medellín"
 author: "Sebastian Valencia Botero ; Andres Felipe Cadavid Sanguino ; Julián Esteban Ariza Caro"
 date: today
+lang: es
+params:
+  fecha_corte: "2025-12"
+  horizonte: 12
 format:
+  html:
+    number-sections: true
+    toc: true
+    embed-resources: true
   pdf:
     number-sections: true
     toc: true
@@ -20,6 +28,7 @@ format:
         \usepackage{array}
         \usepackage{graphicx}
 bibliography: referencias.bib
+csl: apa.csl
 editor: visual
 execute: 
   echo: false
@@ -27,15 +36,28 @@ execute:
 
 ```{r, include=FALSE}
 
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 library(dplyr)
 library(tidyr)
 library(purrr)
 library(tibble)
 library(ggplot2)
 library(kableExtra)
-library(forecast)
 library(patchwork)
+library(tsibble)
+library(fable)
+library(feasts)
+set.seed(20261118)
+
+source(here::here("R", "02-limpieza.R"), encoding = "UTF-8")
+serie <- leer_serie_procesada() |>
+  filter(mes <= yearmonth(params$fecha_corte))
+fmt <- function(x, d = 0) format(round(x, d), big.mark = " ", decimal.mark = ",", nsmall = d)
+mes_texto <- function(m) {
+  meses <- c("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+             "septiembre", "octubre", "noviembre", "diciembre")
+  paste(meses[lubridate::month(as.Date(m))], "de", lubridate::year(as.Date(m)))
+}
 
 ```
 
@@ -46,42 +68,43 @@ Series de tiempo univariadas, 2026-II · Prof. Juan Pablo Valencia Arango \| Tra
 
 ------------------------------------------------------------------------
 
-# Pronóstico del hurto mensual de automóviles en Antioquia para la tarifa del seguro de hurto {.unnumbered}
+# Pronóstico del hurto mensual de automóviles en Medellín para la tarifa del seguro de hurto {.unnumbered}
 
 Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valencia Botero
 
 # Tema
 
-La serie es muestra el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Antioquia, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos (Policía Nacional de Colombia, 2026); la serie es mensual, se obtiene con código en R contando los registros de cada mes. El conjunto cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal.
+La serie es el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Medellín, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos [@policia2026]; la serie mensual se obtiene con código en R contando los registros de cada mes. El conjunto de Antioquia cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal; 18 824 de ellos ocurrieron en Medellín.
 
-El nivel cambia por tramos: cerca de 200 hurtos por mes en 2011–2013, entre 110 y 130 en 2014–2021, alrededor de 150 en 2022–2024 y 123 en 2025. Hay datos atípicos presentes en los años 2012 y 2020 donde se reducen los hurtos, ademas hay posibles cambios de nivel que se tratarán como intervenciones: noviembre y diciembre de 2012 (72 y 102 hurtos, con una caída que sugiere un problema de registro), la caída de 2014, la integración de los registros de la Policía y la Fiscalía y la denuncia virtual en 2017, que según @rodriguez2018 restaron comparabilidad a la serie, y abril de 2020 (34 hurtos, por el aislamiento obligatorio). La estacionalidad es débil: entre 2014 y 2019 el índice mensual va de 0,90 en diciembre a 1,06 en noviembre.
+Al explorar la base de datos se observa que la mayoría de los hurtos de automotores del departamento ocurren en el Valle de Aburrá, y que Medellín concentra el 66 % de ellos entre 2011 y 2025. Por esta razón se pronostica la serie de la ciudad.
 
+La muestra va de enero de 2011 a `r mes_texto(max(serie$mes))`, con $T = `r nrow(serie)`$ meses y `r fmt(sum(serie$hurtos))` hurtos. El año 2010 queda fuera porque parece incompleto (815 hurtos, frente a 2 001 en 2011), y los meses de 2026 porque la fuente aún consolida sus cifras; el informe está parametrizado por la fecha de corte para extender la muestra cuando se consoliden.
 
-Al explorar la base de datos, se observa que la mayoría de los hurtos de automotores ocurren en el Valle de Aburrá, especialmente en Medellín, donde se concentra alrededor del $66 \%$ de los casos. Por esta razón, se decide pronosticar el número de hurtos en esta ciudad.
+El nivel cambia por tramos: en promedio, entre 138 y 167 hurtos por mes en 2011–2013, entre 72 y 99 en 2014–2021, entre 86 y 92 en 2022–2024 y 77 en 2025. Hay meses atípicos: septiembre, noviembre y diciembre de 2012 (92, 54 y 61 hurtos, frente a 148 en octubre de 2012 y 187 en enero de 2013, una caída que sugiere un problema de registro) y abril de 2020 (21 hurtos, por el aislamiento obligatorio). Hay además dos cambios de nivel candidatos: la caída de 2014 y el aumento de 2017, año en que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual restaron comparabilidad a la serie [@rodriguez2018]. La estacionalidad es débil; la sección de solución la cuantifica.
 
-# Usuario y Practica vigente
+# Usuario y práctica vigente
 
-El usuario es el área actuarial de una aseguradora de automóviles, y su decisión es la tarifa de la cobertura de hurto en la renovación anual de las pólizas. La prima de riesgo de esa cobertura depende de la frecuencia esperada de hurto durante el año de vigencia, de modo que el pronóstico de uno a los doce meses siguientes informa la prima y el presupuesto de siniestros. Si la frecuencia se subestima, la prima resulta insuficiente y la cartera pierde dinero; si se sobreestima, la prima pierde competitividad y equidad. La ley exige que las tarifas cumplan los principios de equidad y suficiencia y se basen en información estadística homogénea y representativa (Presidencia de la República de Colombia, 1993, art. 184).
+El usuario es el área actuarial de una aseguradora de automóviles, y su decisión es la tarifa de la cobertura de hurto en la renovación anual de las pólizas. La prima de riesgo de esa cobertura depende de la frecuencia esperada de hurto durante el año de vigencia, de modo que el pronóstico de uno a los doce meses siguientes informa la prima y el presupuesto de siniestros. Si la frecuencia se subestima, la prima resulta insuficiente y la cartera pierde dinero; si se sobreestima, la prima pierde competitividad y equidad. La ley exige que las tarifas cumplan los principios de equidad y suficiencia y se basen en información estadística homogénea y representativa [@eosf1993, art. 184].
 
-La práctica actuarial documentada proyecta la frecuencia al periodo de vigencia ajustando una tendencia lineal o exponencial a la historia; en líneas de cola corta, como los daños a automóviles, se usan totales de doce meses móviles para suavizar la estacionalidad (Werner & Modlin, 2016, cap. 6).
+La práctica actuarial documentada proyecta la frecuencia al periodo de vigencia ajustando una tendencia lineal o exponencial a la historia; en líneas de cola corta, como los daños a automóviles, se usan totales de doce meses móviles para suavizar la estacionalidad [@werner2016, cap. 6].
 
-El pronóstico se entrega al área actuarial como un factor de tendencia: el total de hurtos pronosticado para los doce meses siguientes dividido entre el total observado en los doce meses anteriores. Ese factor, con su intervalo, se aplica a la frecuencia de hurto de la propia cartera, que es el papel que hoy cumple la tendencia lineal. La serie abarca quince años y registra entre 120 y 150 hurtos al mes, mientras que la experiencia de una sola aseguradora es una fracción de esos casos y la precisión de los pronósticos de delitos depende sobre todo del nivel de los conteos [@gorr2002].
+El pronóstico se entrega al área actuarial como un factor de tendencia: el total de hurtos pronosticado para los doce meses siguientes dividido entre el total observado en los doce meses anteriores. Ese factor, con su intervalo, se aplica a la frecuencia de hurto de la propia cartera, que es el papel que hoy cumple la tendencia lineal. La serie abarca quince años y registra entre 70 y 100 hurtos al mes desde 2014, mientras que la experiencia de una sola aseguradora es una fracción de esos casos y la precisión de los pronósticos de delitos depende sobre todo del nivel de los conteos [@gorr2002].
 
 # Sobre el resultado
 
 Si la respuesta es afirmativa, el área actuarial puede reemplazar el factor de tendencia lineal por el factor que se obtiene del SARIMA. Si es negativa, el área actuarial conserva la tendencia lineal o, si la validación muestra que el naive estacional o Holt–Winters la superan, adopta ese método más simple.
 
-# Pregunta de investigacion
+# Pregunta de investigación
 
-*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico de 1 - 12 meses siguientes de hurtos de automóviles denunciados en Medellín, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre uno a doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
+*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico del total de los doce meses siguientes de hurtos de automóviles denunciados en Medellín, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
 
-La métrica que decide la respuesta es el MASE de los errores de los pronosticos de uno a doce meses, porque esa es la cantidad que entra en la tarifa como factor de tendencia. Se calcula lo mismo en la muestra de entrenamiento, del naive estacional de los doce meses anteriores. se utiliza el MASE porque a diferencia del MAPE, no se indefine con valores cercanos a cero ni trata de forma asimétrica los errores por exceso y por defecto (Hyndman & Koehler, 2006).
+La métrica que decide la respuesta es el MASE del total de los doce meses siguientes, porque ese total es la cantidad que entra en la tarifa como factor de tendencia. Su escalador es el error absoluto medio, en la muestra de entrenamiento, del naive estacional del total, que repite el total de los doce meses anteriores. El MASE y el RMSE por horizonte, de 1 a 12 meses, son complementarios. Se utiliza el MASE porque, a diferencia del MAPE, no se indefine con valores cercanos a cero ni trata de forma asimétrica los errores por exceso y por defecto [@hyndman2006].
 
-**Criterio de respuesta**. Diremos que el SARIMA mejora el pronóstico si su MASE del total de doce meses, promediado sobre los numero orígenes de la validación, es menor que el de cada uno de los tres referentes y si la prueba de Diebold y Mariano con la corrección de Harvey, Leybourne y Newbold, aplicada a los errores absolutos del total con una varianza robusta al solapamiento de los horizontes, rechaza al 5 % la igualdad de precisión frente a cada referente. En otro caso la respuesta es negativa y se reporta así, sin cambiar de modelo.
+**Criterio de respuesta**. Diremos que el SARIMA mejora el pronóstico si su MASE del total de doce meses, promediado sobre los 73 orígenes de la validación, es menor que el de cada uno de los tres referentes y si la prueba de Diebold y Mariano con la corrección de Harvey, Leybourne y Newbold, aplicada a los errores absolutos del total con una varianza robusta al solapamiento de los horizontes, rechaza al 5 % la igualdad de precisión frente a cada referente. En otro caso la respuesta es negativa y se reporta así, sin cambiar de modelo.
 
 # Objetivo general
 
-Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del total de doce meses de hurtos de automóviles denunciados en Antioquia frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles, mediante validación de origen móvil sobre la serie mensual de enero de 2010 a diciembre de 2025.
+Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del total de doce meses de hurtos de automóviles denunciados en Medellín frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles, mediante validación de origen móvil sobre la serie mensual de enero de 2011 a diciembre de 2025.
 
 # Objetivos específicos
 
@@ -89,9 +112,9 @@ Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del to
 
 2.  Determinar la transformación y el orden de integración regular y estacional. Producto: $\lambda$ de Box y Cox estimado en entrenamiento y tabla de las pruebas ADF, PP, KPSS y de raíz estacional.
 
-3.  Estimar por máxima verosimilitud y diagnosticar los SARIMA candidatos. Producto: tabla de coeficientes con errores estándar, criterios de información y diagnóstico de residuos.
+3.  Estimar por máxima verosimilitud y diagnosticar los SARIMA candidatos con intervenciones, y la versión con desempleo como regresión con errores SARIMA. Producto: tabla de coeficientes con errores estándar, criterios de información y diagnóstico de residuos.
 
-4.  Comparar la precisión del SARIMA con la de los tres referentes en origen móvil, con entrenamiento inicial de enero de 2010 a diciembre de 2020 y numero orígenes, de diciembre de 2020 a diciembre de 2025. Producto: MASE del total y error del factor de tendencia, MASE y RMSE por horizonte, cobertura empírica al 80 y al 95 %, Diebold y Mariano frente a cada referente, Clark y West para la covariable y veredicto.
+4.  Comparar la precisión del SARIMA con la de los tres referentes en origen móvil, con entrenamiento inicial de enero de 2011 a diciembre de 2018 (96 meses) y 73 orígenes, de diciembre de 2018 a diciembre de 2024. Producto: MASE del total y error del factor de tendencia, MASE y RMSE por horizonte, cobertura empírica al 80 y al 95 % (gaussiana y por bootstrap), Diebold y Mariano frente a cada referente, Clark y West para la covariable, sensibilidad a la ventana (creciente frente a fija de 96 meses) y a excluir los orígenes cuyo horizonte incluye 2020, y veredicto.
 
 5.  Implementar el pronóstico en una herramienta que el área actuarial pueda consultar sin asistencia. Producto: aplicación Shiny que recibe la fecha de corte y el horizonte y devuelve el pronóstico mensual, el total de doce meses y el factor de tendencia con sus intervalos, e informe Quarto parametrizado.
 
@@ -113,7 +136,7 @@ En el dominio colombiano, @medina2017 modelan la frecuencia mensual del hurto de
 
 La referencia @personeria2015 analiza el impacto de las políticas y estrategias públicas de seguridad implementadas en Medellín entre 2011 y 2015. En ese periodo, se identificaron cambios sustanciales en la dinámica de los hurtos de automotores, cuya disminución se relacionó con medidas como el aumento del pie de fuerza, la implementación de cuadrantes y la renovación de la infraestructura.
 
-La tabla 1 resume las nueve fuentes. La literatura también da una referencia para calibrar el resultado propio: a un mes, el MAPE de los conteos mensuales de delitos ronda el 20 % en unidades con unos 30 delitos al mes [@gorr2002], el menor MAPE de los delitos contra la propiedad por precinto es de 9,4 a 10,5 % [@cohen2005], y a nivel de ciudad el error ponderado de la mejor combinación es del 6,6 % [@ashby2023]. La serie de Antioquia, con 120 a 150 hurtos al mes, está en el rango de conteos en que esos errores se obtuvieron, aunque las métricas no son directamente comparables con el MASE.
+La tabla 1 resume las nueve fuentes. La literatura también da una referencia para calibrar el resultado propio: a un mes, el MAPE de los conteos mensuales de delitos ronda el 20 % en unidades con unos 30 delitos al mes [@gorr2002], el menor MAPE de los delitos contra la propiedad por precinto es de 9,4 a 10,5 % [@cohen2005], y a nivel de ciudad el error ponderado de la mejor combinación es del 6,6 % [@ashby2023]. La serie de Medellín, con 70 a 100 hurtos al mes desde 2014, está en el rango de conteos en que esos errores se obtuvieron, aunque las métricas no son directamente comparables con el MASE.
 
 ## Brecha
 
