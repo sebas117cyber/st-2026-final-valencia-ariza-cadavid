@@ -5,8 +5,10 @@ library(lubridate)
 library(tidyverse)
 library(plotly)
 
-Hurtos_ANT <- read_csv("base_data/Reporte_Hurto_de_motocicletas_y_automotores_en_el_Departamento_de_Antioquia_-_Policía_Nacional_20260930.csv"
-)
+source(here::here("R", "util-lectura.R"))
+source(here::here("R", "util-graficos.R"))
+
+Hurtos_ANT <- read_csv(here::here("datos", "crudos", "hurtos_antioquia_registros_20260930.csv"))
 
 
 # Procesar las fechas y agrupar por mes
@@ -247,16 +249,16 @@ serie_Bello <- leer_serie(
 graficar_serie(serie_Bello, "Robos registrado en Bello ")
 
 
-remove(Hurtos_ANT, df_mensual_Rio, df_mensual_med, df_mensual_Envi, df_mensual_antioqua, 
-       df_mensual_Bello, anio_inicio, mes_inicio, serie_ts_ant, serie_ts_Rio, serie_ts_med, serie_ts_Envi)
+
 
 
 #---- Valle de aburra----
 
 df_mensual_Valle <- Hurtos_ANT |>
   rename(T_hurto = `TIPO DE HURTO`) |>
-  filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES" & MUNICIPIO == "Bello"
-         & MUNICIPIO == "Medellín (CT)") |>
+  filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES",
+         MUNICIPIO %in% c("Medellín (CT)", "Bello", "Itagui", "Envigado", "Sabaneta",
+                          "La Estrella", "Caldas", "Copacabana", "Girardota", "Barbosa")) |>
   mutate(
     fecha_dt = dmy(`FECHA HECHO`),
     fecha = floor_date(fecha_dt, unit = "month")
@@ -289,7 +291,6 @@ serie_Valle <- leer_serie(
 
 graficar_serie(serie_Valle, "Robos de autos registrados en Valle de Aburra ")
 
-
-
-
-
+remove(Hurtos_ANT, df_mensual_Rio, df_mensual_med, df_mensual_Envi, df_mensual_antioqua,
+       df_mensual_Bello, df_mensual_Valle, anio_inicio, mes_inicio, serie_ts_ant, serie_ts_Rio,
+       serie_ts_med, serie_ts_Envi, serie_ts_Bello, serie_ts_Valle)
