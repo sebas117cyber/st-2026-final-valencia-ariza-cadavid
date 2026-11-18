@@ -181,6 +181,7 @@ La tabla 2 fija la notación que se usa en el resto del documento. Las definicio
 | $h$ | Horizonte de pronóstico, de 1 a 12 meses |
 | $\hat y_{t_0+h \mid t_0}$, $e_{t_0,h}$ | Pronóstico hecho en $t_0$ para $t_0+h$ y su error, $e_{t_0,h} = y_{t_0+h} - \hat y_{t_0+h \mid t_0}$ |
 | $M_t$ | Total de 12 meses móviles: $M_t = \sum_{j=0}^{11} y_{t-j}$ |
+| $n_w$ | Número de totales móviles con que se ajusta la tendencia lineal ($n_w = 36$) |
 | $S_{t_0}$, $\hat S_{t_0}$ | Total de los 12 meses siguientes, $S_{t_0} = \sum_{h=1}^{12} y_{t_0+h} = M_{t_0+12}$, y su pronóstico |
 | $F_{t_0}$ | Factor de tendencia: $F_{t_0} = \hat S_{t_0} / M_{t_0}$ |
 | $q_{t_0}$, $q^S_{t_0}$ | Escaladores del MASE por horizonte y del MASE del total |
@@ -309,7 +310,7 @@ $$
 
 y pronostica $\hat y_{t_0+h \mid t_0} = \ell_{t_0} + h b_{t_0} + s_{t_0+h-12}$ para $h \leq 12$; la versión multiplicativa divide por el componente estacional en lugar de restarlo [@fpp3, sec. 8.3]. Los parámetros se estiman por máxima verosimilitud en la forma de espacio de estados [@fpp3, secs. 8.5 y 8.6].
 
-La **tendencia lineal sobre totales de 12 meses móviles** reproduce la práctica actuarial [@werner2016, cap. 6]. En cada origen se ajusta por mínimos cuadrados la recta $M_t = a + b\,t$ sobre los últimos $n_w$ totales móviles disponibles, $t = t_0 - n_w + 1, \dots, t_0$, y se proyecta al final del año siguiente: $\hat S_{t_0} = \hat a + \hat b\,(t_0 + 12)$. Como los totales consecutivos comparten 11 meses, los residuos de la recta están autocorrelacionados; esto no afecta al pronóstico puntual, que es lo único que se usa del referente.
+La **tendencia lineal sobre totales de 12 meses móviles** reproduce la práctica actuarial [@werner2016, cap. 6]. En cada origen se ajusta por mínimos cuadrados la recta $M_t = a + b\,t$ sobre los últimos $n_w = 36$ totales móviles disponibles, $t = t_0 - 35, \dots, t_0$, y se proyecta al final del año siguiente: $\hat S_{t_0} = \hat a + \hat b\,(t_0 + 12)$. La ventana de tres años da suficientes puntos para estimar la pendiente sin que la recta quede dominada por la caída de nivel de 2011–2014, que ya no representa el nivel reciente de la serie; se fijó antes de la validación y no se ajusta con sus resultados. Como los totales consecutivos comparten 11 meses, los residuos de la recta están autocorrelacionados; esto no afecta al pronóstico puntual, que es lo único que se usa del referente.
 
 ## Evaluación fuera de muestra
 
