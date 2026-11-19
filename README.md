@@ -16,10 +16,14 @@ install.packages("renv")   # si no está instalado
 renv::restore()            # instala las versiones exactas de renv.lock
 ```
 
+Si `quarto` no está en el PATH de R, defina `QUARTO_R` o renderice a mano con
+`quarto render informe/trabajo-final.qmd`. Para otra fecha de corte:
+`quarto render informe/trabajo-final.qmd -P fecha_corte:2024-12`.
+
 ## Ejecución
 
 ```sh
-Rscript ejecutar-todo.R              # reconstruye datos/procesados y corre las pruebas
+Rscript ejecutar-todo.R              # serie procesada, pruebas e informe (HTML y PDF)
 Rscript ejecutar-todo.R --descargar  # además baja una copia nueva y la compara
 ```
 
@@ -35,6 +39,8 @@ Rscript ejecutar-todo.R --descargar  # además baja una copia nueva y la compara
 ├── R/
 │   ├── 01-descarga.R       descarga desde la API de datos.gov.co
 │   ├── 02-limpieza.R       registros → serie mensual
+│   ├── 03-modelos.R        intervenciones, rejilla SARIMA y regla de selección
+│   ├── 04-diagnostico.R    raíz unitaria y diagnóstico de residuos
 │   └── util-*.R            funciones de los talleres del curso
 ├── tests/testthat/         pruebas de las funciones propias
 ├── exploratorio/           análisis exploratorio por municipio

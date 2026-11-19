@@ -28,4 +28,8 @@ guardar_serie(serie)
 # 3. Pruebas de las funciones propias --------------------------------------------
 testthat::test_dir(here::here("tests", "testthat"), stop_on_failure = TRUE)
 
-message("Listo: ", nrow(serie), " meses, ", sum(serie$hurtos), " hurtos.")
+# 4. Informe (HTML y PDF) con la fecha de corte por defecto -----------------------
+estado <- system2("quarto", c("render", shQuote(here::here("informe", "trabajo-final.qmd"))))
+if (estado != 0) stop("Quarto no pudo renderizar el informe.")
+
+message("Listo: ", nrow(serie), " meses, ", sum(serie$hurtos), " hurtos; informe en informe/.")

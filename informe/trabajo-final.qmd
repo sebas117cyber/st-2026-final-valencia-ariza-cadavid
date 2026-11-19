@@ -48,8 +48,11 @@ library(tsibble)
 library(fable)
 library(feasts)
 set.seed(20261118)
+options(OutDec = ",", knitr.kable.NA = "")
 
-source(here::here("R", "02-limpieza.R"), encoding = "UTF-8")
+for (f in c("02-limpieza.R", "03-modelos.R", "util-evaluacion.R", "04-diagnostico.R")) {
+  source(here::here("R", f), encoding = "UTF-8")
+}
 serie <- leer_serie_procesada() |>
   filter(mes <= yearmonth(params$fecha_corte))
 fmt <- function(x, d = 0) format(round(x, d), big.mark = " ", decimal.mark = ",", nsmall = d)
@@ -355,6 +358,206 @@ $$
 $$
 
 donde el modelo 1 es el anidado; se rechaza la igualdad de error cuadrático medio a favor del modelo grande si el estadístico $t$ de la media de $\hat f$, con error estándar robusto a autocorrelación, supera 1,645 [@clark2006, sec. 2, ec. (2.1)].
+
+# Solución
+
+Esta sección cubre los objetivos específicos 1 a 3. La identificación, la estimación y el diagnóstico usaron solo el entrenamiento inicial, de enero de 2011 a diciembre de 2018 (96 meses), para que ninguna decisión del modelo dependa de los meses que se pronostican en la validación.
+
+```{r datos-solucion}
+entrenamiento <- serie |> filter(mes <= yearmonth("2018-12"))
+meses_ao <- c("2012-09", "2012-11", "2012-12")
+reg_ao <- paste0("ao_", gsub("-", "", meses_ao))
+entrenamiento_int <- agregar_intervenciones(entrenamiento, ao = meses_ao,
+                                            ls = c("2014-01", "2017-01"))
+```
+
+## Caracterización de la serie (OE1)
+
+```{r fig-serie, fig.cap = "Hurtos mensuales de automóviles denunciados en Medellín. Los puntos marcan los meses atípicos; la línea vertical separa el entrenamiento inicial (a la izquierda) de los meses que se pronostican en la validación."}
+atipicos <- serie |> filter(format(as.Date(mes), "%Y-%m") %in% c(meses_ao, "2020-04"))
+ggplot(serie, aes(x = as.Date(mes), y = hurtos)) +
+  geom_line(colour = "grey30") +
+  geom_point(data = atipicos, colour = "firebrick", size = 2) +
+  geom_vline(xintercept = as.Date("2019-01-01"), linetype = "dashed") +
+  labs(x = "Mes", y = "Hurtos de automóviles por mes") +
+  theme_minimal()
+```
+
+La figura 1 muestra la serie completa. El nivel cae de forma sostenida entre 2011 y 2016, se estabiliza entre 70 y 100 hurtos mensuales desde 2015 y no muestra una tendencia clara después. Los tres meses de 2012 marcados quedan muy por debajo de sus vecinos, y abril de 2020 es el mínimo de la serie, durante el aislamiento obligatorio. La variabilidad es mayor cuando el nivel es más alto, lo que motiva la transformación de la sección siguiente.
+
+```{r stl}
+stl_entrenamiento <- entrenamiento |>
+  model(STL(log(hurtos) ~ season(window = "periodic"), robust = TRUE)) |>
+  components()
+indices <- stl_entrenamiento |> as_tibble() |>
+  mutate(mes_del_anio = lubridate::month(as.Date(mes))) |>
+  group_by(mes_del_anio) |> summarise(indice = exp(mean(season_year)))
+fs <- fuerza_estacional(entrenamiento, log(hurtos))
+```
+
+```{r fig-stl, fig.cap = "Descomposición STL robusta del logaritmo de los hurtos mensuales en el entrenamiento (enero de 2011 a diciembre de 2018). De arriba abajo: serie, tendencia, componente estacional y resto, todos en logaritmos de hurtos por mes."}
+autoplot(stl_entrenamiento) + labs(x = "Mes") + theme_minimal()
+```
+
+La descomposición STL de la figura 2 atribuye casi toda la variación a la tendencia. El componente estacional es pequeño: la fuerza estacional es $F_S = `r fmt(fs$fuerza_estacional, 2)`$, lejos del umbral de 0,64. La tabla 3 traduce el componente estacional a índices multiplicativos: van de `r fmt(min(indices$indice), 2)` en el mes más bajo a `r fmt(max(indices$indice), 2)` en el más alto, es decir, de `r fmt(100 * (1 - min(indices$indice)))` % menos a `r fmt(100 * (max(indices$indice) - 1))` % más hurtos que un mes típico, y no forman un patrón regular a lo largo del año. El resto concentra los atípicos de 2012.
+
+```{r tabla-indices}
+indices |>
+  mutate(mes = c("Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")[mes_del_anio]) |>
+  select(mes, indice) |>
+  pivot_wider(names_from = mes, values_from = indice) |>
+  knitr::kable(digits = 2, caption = "Tabla 3: Índices estacionales multiplicativos de la STL en el entrenamiento (1 = mes típico)")
+```
+
+La tabla 4 resume los atípicos y los cambios de nivel candidatos con su tratamiento; la evidencia de cada decisión está en la sección de identificación. Abril de 2020 y diciembre de 2024 quedan fuera del entrenamiento: la validación los enfrenta tal como ocurrieron, y el análisis de sensibilidad excluye los orígenes cuyo horizonte incluye 2020.
+
+```{r tabla-atipicos}
+tibble::tribble(
+  ~Mes, ~Hurtos, ~Hipótesis, ~Tratamiento,
+  "Septiembre de 2012", "92", "Problema de registro", "Atípico aditivo (iteración 3)",
+  "Noviembre de 2012", "54", "Problema de registro", "Atípico aditivo (iteración 2)",
+  "Diciembre de 2012", "61", "Problema de registro", "Atípico aditivo (iteración 2)",
+  "Enero de 2014", "100", "Caída de nivel", "Cambio de nivel probado y descartado",
+  "Enero de 2017", "81", "Integración de registros y denuncia virtual", "Cambio de nivel probado y descartado",
+  "Abril de 2020", "21", "Aislamiento obligatorio", "Fuera del entrenamiento; sensibilidad en la validación"
+) |>
+  knitr::kable(caption = "Tabla 4: Atípicos e intervenciones candidatas")
+```
+
+## Transformación y orden de integración (OE2)
+
+```{r lambda}
+lambda_guerrero <- entrenamiento |> features(hurtos, guerrero) |> pull(lambda_guerrero)
+tabla_lambda <- comparar_lambda(entrenamiento_int, lambdas = c(lambda_guerrero, 0, 0.5, 1),
+                                orden = c(0, 1, 1, 0, 0, 1), regresores = reg_ao)
+```
+
+El método de Guerrero, aplicado al entrenamiento, sugiere $\lambda = `r fmt(lambda_guerrero, 2)`$, un valor muy negativo que responde sobre todo a la caída de nivel de 2011–2014. Para decidir con un criterio que no dependa de esa caída, se comparó la log-verosimilitud en la escala original del modelo finalmente elegido para cuatro valores de $\lambda$ (tabla 5). El logaritmo ($\lambda = 0$) tiene la mayor verosimilitud, `r fmt(tabla_lambda$loglik_original[2] - tabla_lambda$loglik_original[1], 1)` unidades por encima del valor de Guerrero, y además permite leer los efectos como cambios porcentuales. Se trabajó con $w_t = \log y_t$.
+
+```{r tabla-lambda}
+tabla_lambda |>
+  mutate(lambda = c("Guerrero", "0 (logaritmo)", "0,5", "1 (sin transformar)")) |>
+  knitr::kable(digits = 1, col.names = c("λ", "Log-verosimilitud de w", "Log-verosimilitud de y"),
+               caption = "Tabla 5: Log-verosimilitud del SARIMA(0,1,1)(0,0,1)12 con atípicos según λ, en el entrenamiento")
+```
+
+```{r raiz-unitaria}
+log_entrenamiento <- log(entrenamiento$hurtos)
+tabla_raiz <- bind_rows(
+  pruebas_raiz_unitaria(log_entrenamiento) |> mutate(serie = "log y", .before = 1),
+  pruebas_raiz_unitaria(diff(log_entrenamiento)) |> mutate(serie = "∇ log y", .before = 1)
+)
+```
+
+La tabla 6 reúne las pruebas de raíz unitaria. En el nivel del logaritmo, ADF no rechaza la raíz unitaria ($\tau = `r fmt(tabla_raiz$estadistico[1], 2)`$, frente a un valor crítico de $-2{,}89$) y KPSS rechaza la estacionariedad; PP sí rechaza la raíz unitaria, lo que es compatible con una serie cuyo nivel cambia por tramos. En la primera diferencia las tres pruebas coinciden en la estacionariedad. Se tomó $d = 1$. Como $F_S = `r fmt(fs$fuerza_estacional, 2)` < 0{,}64$, no se tomó diferencia estacional ($D = 0$).
+
+```{r tabla-raiz}
+tabla_raiz |>
+  mutate(rechaza_h0 = ifelse(rechaza_h0, "Sí", "No")) |>
+  knitr::kable(digits = 3, col.names = c("Serie", "Prueba", "H0", "Estadístico", "Valor crítico al 5 %",
+                                         "Valor p", "Rechaza H0 al 5 %"),
+               caption = "Tabla 6: Pruebas de raíz unitaria en el entrenamiento")
+```
+
+## Identificación, estimación y diagnóstico (OE3)
+
+```{r fig-acf, fig.cap = "ACF y PACF de la primera diferencia del logaritmo de los hurtos mensuales en el entrenamiento, hasta el rezago 36. Las líneas punteadas son las bandas de ±1,96/√T."}
+entrenamiento |>
+  mutate(dlog = difference(log(hurtos))) |>
+  gg_tsdisplay(dlog, plot_type = "partial", lag_max = 36) +
+  labs(y = "∇ log(hurtos)")
+```
+
+```{r acf-valores}
+acf_dlog <- entrenamiento |> mutate(dlog = difference(log(hurtos))) |> ACF(dlog, lag_max = 24)
+```
+
+En la figura 3, la ACF de $\nabla \log y_t$ tiene un único valor claramente fuera de las bandas, $r_1 = `r fmt(acf_dlog$acf[1], 2)`$, mientras que la PACF decae en los primeros rezagos. Ese patrón identifica una componente MA(1) regular. En los rezagos 12 y 24 las autocorrelaciones son pequeñas ($r_{12} = `r fmt(acf_dlog$acf[12], 2)`$, $r_{24} = `r fmt(acf_dlog$acf[24], 2)`$), de modo que la parte estacional, si existe, es débil; se dejó que la rejilla decidiera entre $P, Q \in \{0, 1\}$.
+
+```{r iteraciones}
+especificaciones <- list(
+  "1. Sin intervenciones" = character(),
+  "2. AO nov. y dic. de 2012" = reg_ao[2:3],
+  "3. AO sep., nov. y dic. de 2012" = reg_ao,
+  "4. Iteración 3 + LS ene. de 2014" = c(reg_ao, "ls_201401"),
+  "5. Iteración 3 + LS ene. de 2017" = c(reg_ao, "ls_201701")
+)
+iteraciones <- purrr::imap_dfr(especificaciones, function(reg, nombre) {
+  ajuste <- ajustar_sarima(entrenamiento_int, c(0, 1, 1, 0, 0, 0), reg)
+  z <- atipicos_residuos(ajuste)
+  tibble(Iteración = nombre, AICc = glance(ajuste)$AICc,
+         `Residuos con |z| > 3` = if (nrow(z) == 0) "Ninguno" else
+           paste(format(as.Date(z$mes), "%m/%Y"), collapse = ", "))
+})
+```
+
+El ciclo de Box y Jenkins se recorrió con el ARIMA(0,1,1) identificado, y en cada iteración se revisaron los residuos estandarizados (tabla 7). Sin intervenciones, el modelo deja residuos mayores que 3 en valor absoluto en septiembre y noviembre de 2012 y en el rebote de enero de 2013. Modelar como atípicos aditivos noviembre y diciembre de 2012, los dos meses que la exploración ya señalaba como probable problema de registro, baja el AICc en `r fmt(iteraciones$AICc[1] - iteraciones$AICc[2], 1)` unidades, pero deja septiembre de 2012 como atípico remanente; agregarlo lo baja otras `r fmt(iteraciones$AICc[2] - iteraciones$AICc[3], 1)` unidades y ya no quedan residuos atípicos. Los cambios de nivel de 2014 y 2017 no mejoran el AICc: con $d = 1$, el paseo aleatorio implícito en el modelo ya absorbe los cambios de nivel graduales, y ambos se descartaron.
+
+```{r tabla-iteraciones}
+knitr::kable(iteraciones, digits = 1,
+             caption = "Tabla 7: Iteraciones de Box y Jenkins con el ARIMA(0,1,1) en logaritmos, en el entrenamiento")
+```
+
+```{r rejilla}
+rejilla <- rejilla_sarima(entrenamiento_int, regresores = reg_ao, d = 1, D = 0) |> elegir_sarima()
+elegido <- filter(rejilla, elegido)
+orden_elegido <- c(elegido$p, 1, elegido$q, elegido$P, 0, elegido$Q)
+```
+
+Con las tres intervenciones fijas, se estimaron todos los SARIMA$(p,1,q)(P,0,Q)_{12}$ con $p, q \leq 2$ y $P, Q \leq 1$: `r nrow(rejilla)` especificaciones con la misma diferenciación y la misma muestra, de las que `r sum(is.na(rejilla$aicc))` no convergió. La regla de selección se fijó antes de ver los resultados: se descartan los modelos con alguna raíz autorregresiva o de medias móviles de módulo menor que 1,01, y entre los admisibles a menos de dos unidades del menor AICc se elige el de menos parámetros. La tabla 8 muestra los diez modelos de menor AICc. Los tres primeros tienen una raíz de medias móviles sobre el círculo unitario ($\hat\theta_2 \approx 1$), señal de sobrediferenciación, y se descartaron. Entre los admisibles, el SARIMA$(`r elegido$p`,1,`r elegido$q`)(`r elegido$P`,0,`r elegido$Q`)_{12}$ tiene el menor número de parámetros a menos de dos unidades del mínimo y fue el elegido. El SARIMA(0,1,1)(1,0,0)$_{12}$, con el mismo número de parámetros y un AICc apenas mayor, queda como especificación alterna para la sensibilidad. En total, contando las cinco iteraciones, la rejilla y las cuatro transformaciones, se exploraron `r 5 + nrow(rejilla) + nrow(tabla_lambda)` especificaciones.
+
+```{r tabla-rejilla}
+rejilla |>
+  arrange(aicc) |> slice_head(n = 10) |>
+  mutate(modelo = sprintf("(%d,1,%d)(%d,0,%d)", p, q, P, Q),
+         decision = case_when(elegido ~ "Elegido", !admisible ~ "No invertible",
+                              cerca_del_minimo ~ "Admisible", TRUE ~ "Lejos del mínimo")) |>
+  select(modelo, aicc, K, raiz_ma_min, decision) |>
+  knitr::kable(digits = 2, col.names = c("SARIMA", "AICc", "K", "Mín. |raíz MA|", "Decisión"),
+               caption = "Tabla 8: Los diez SARIMA de menor AICc en el entrenamiento, con los tres atípicos")
+```
+
+```{r ajuste-elegido}
+ajuste_elegido <- ajustar_sarima(entrenamiento_int, orden_elegido, reg_ao)
+coeficientes <- tidy(ajuste_elegido)
+efecto <- function(termino) 100 * (exp(coeficientes$estimate[coeficientes$term == termino]) - 1)
+```
+
+La tabla 9 presenta las estimaciones de máxima verosimilitud. El modelo estimado es
+
+$$
+(1 - B)\Big(\log y_t - \sum_i \hat\omega_i I^{(i)}_t\Big) = (1 `r ifelse(coeficientes$estimate[1] < 0, "-", "+")` `r fmt(abs(coeficientes$estimate[1]), 3)`\,B)(1 `r ifelse(coeficientes$estimate[2] < 0, "-", "+")` `r fmt(abs(coeficientes$estimate[2]), 3)`\,B^{12})\, \varepsilon_t ,
+\qquad \hat\sigma^2 = `r fmt(glance(ajuste_elegido)$sigma2, 4)` .
+$$
+
+Todos los coeficientes son significativos al 5 %. El MA(1) regular, cercano a $-0{,}7$, indica que la serie se comporta como un nivel local que se actualiza lentamente: cada mes corrige alrededor del 30 % de la sorpresa del mes anterior. El MA estacional positivo recoge una dependencia débil con el mismo mes del año anterior. Los atípicos equivalen a caídas de `r fmt(-efecto("ao_201209"))` % en septiembre, `r fmt(-efecto("ao_201211"))` % en noviembre y `r fmt(-efecto("ao_201212"))` % en diciembre de 2012 respecto a lo que el modelo esperaba.
+
+```{r tabla-coeficientes}
+coeficientes |>
+  mutate(term = recode(term, ma1 = "θ1 (MA regular)", sma1 = "Θ1 (MA estacional)",
+                       ao_201209 = "ω, AO sep. 2012", ao_201211 = "ω, AO nov. 2012",
+                       ao_201212 = "ω, AO dic. 2012")) |>
+  select(term, estimate, std.error, statistic, p.value) |>
+  knitr::kable(digits = 3, col.names = c("Parámetro", "Estimación", "Error estándar", "z", "Valor p"),
+               caption = "Tabla 9: Estimaciones de máxima verosimilitud del SARIMA elegido, en el entrenamiento")
+```
+
+```{r fig-residuos, fig.cap = "Residuos del SARIMA elegido en el entrenamiento (logaritmo de hurtos por mes): serie temporal, ACF hasta el rezago 36 e histograma."}
+gg_tsresiduals(ajuste_elegido, lag_max = 36)
+```
+
+```{r diagnostico}
+residuos <- augment(ajuste_elegido)$.innov
+tabla_diagnostico <- diagnostico_residuos(residuos, K = elegido$K, rezagos = 24)
+```
+
+El diagnóstico no encuentra problemas (figura 4 y tabla 10). Ljung y Box no rechaza la ausencia de autocorrelación hasta el rezago 24 con $24 - K = `r 24 - elegido$K`$ grados de libertad (valor p de `r fmt(tabla_diagnostico$valor_p[1], 2)`), McLeod y Li no detecta heterocedasticidad condicional (`r fmt(tabla_diagnostico$valor_p[2], 2)`), y ni Shapiro y Wilk ni Jarque y Bera rechazan la normalidad (`r fmt(tabla_diagnostico$valor_p[3], 2)` y `r fmt(tabla_diagnostico$valor_p[4], 2)`). No quedan residuos con valor absoluto mayor que 3. Los supuestos de los intervalos gaussianos se sostienen en el entrenamiento; la validación comparará su cobertura con la de los intervalos por bootstrap.
+
+```{r tabla-diagnostico}
+knitr::kable(tabla_diagnostico, digits = 3,
+             col.names = c("Prueba", "H0", "Estadístico", "Grados de libertad", "Valor p"),
+             caption = "Tabla 10: Diagnóstico de los residuos del SARIMA elegido (rezago 24)")
+```
 
 # Referencias
 
