@@ -1,4 +1,38 @@
+# RStudio / R session
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+
+# renv: only renv.lock, .Rprofile and renv/activate.R are versioned
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+renv/staging/
+
+# Quarto / knitr outputs
+/.quarto/
+informe/*_files/
+informe/*_cache/
+informe/*.html
+informe/*.pdf
+informe/*.tex
+*.log
+*.aux
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.out
+*.toc
+
+# Generated outputs (rebuilt by ejecutar-todo.R)
+salidas/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

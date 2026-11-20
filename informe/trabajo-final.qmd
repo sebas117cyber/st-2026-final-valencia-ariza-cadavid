@@ -1,0 +1,362 @@
+---
+title: "Trabajo Final informe"
+subtitle: "Series de Tiempo — Pregrado en Estadística, UNAL Medellín"
+author: "Sebastian Valencia Botero ; Andres Felipe Cadavid Sanguino ; Julián Esteban Ariza Caro"
+date: today
+lang: es
+params:
+  fecha_corte: "2025-12"
+  horizonte: 12
+format:
+  html:
+    number-sections: true
+    toc: true
+    embed-resources: true
+  pdf:
+    number-sections: true
+    toc: true
+    fig-width: 6
+    fig-height: 4
+    geometry:
+      - a4paper
+      - margin=1.5cm
+      - landscape
+    include-in-header:
+      text: |
+        \usepackage{tabularx}
+        \usepackage{xcolor}
+        \usepackage{array}
+        \usepackage{graphicx}
+bibliography: referencias.bib
+csl: apa.csl
+editor: visual
+execute: 
+  echo: false
+---
+
+```{r, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(tibble)
+library(ggplot2)
+library(kableExtra)
+library(patchwork)
+library(tsibble)
+library(fable)
+library(feasts)
+set.seed(20261118)
+
+source(here::here("R", "02-limpieza.R"), encoding = "UTF-8")
+serie <- leer_serie_procesada() |>
+  filter(mes <= yearmonth(params$fecha_corte))
+fmt <- function(x, d = 0) format(round(x, d), big.mark = " ", decimal.mark = ",", nsmall = d)
+mes_texto <- function(m) {
+  meses <- c("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+             "septiembre", "octubre", "noviembre", "diciembre")
+  paste(meses[lubridate::month(as.Date(m))], "de", lubridate::year(as.Date(m)))
+}
+
+```
+
+
+
+Universidad Nacional de Colombia, sede Medellín · Departamento de Estadística \| Noviembre de 2026\
+Series de tiempo univariadas, 2026-II · Prof. Juan Pablo Valencia Arango \| Trabajo final
+
+------------------------------------------------------------------------
+
+# Pronóstico del hurto mensual de automóviles en Medellín para la tarifa del seguro de hurto {.unnumbered}
+
+Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valencia Botero
+
+# Tema
+
+La serie es el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Medellín, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos [@policia2026]; la serie mensual se obtiene con código en R contando los registros de cada mes. El conjunto de Antioquia cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal; 18 824 de ellos ocurrieron en Medellín.
+
+Al explorar la base de datos se observa que la mayoría de los hurtos de automotores del departamento ocurren en el Valle de Aburrá, y que Medellín concentra el 66 % de ellos entre 2011 y 2025. Por esta razón se pronostica la serie de la ciudad.
+
+La muestra va de enero de 2011 a `r mes_texto(max(serie$mes))`, con $T = `r nrow(serie)`$ meses y `r fmt(sum(serie$hurtos))` hurtos. El año 2010 queda fuera porque parece incompleto (815 hurtos, frente a 2 001 en 2011), y los meses de 2026 porque la fuente aún consolida sus cifras; el informe está parametrizado por la fecha de corte para extender la muestra cuando se consoliden.
+
+El nivel cambia por tramos: en promedio, entre 138 y 167 hurtos por mes en 2011–2013, entre 72 y 99 en 2014–2021, entre 86 y 92 en 2022–2024 y 77 en 2025. Hay meses atípicos: septiembre, noviembre y diciembre de 2012 (92, 54 y 61 hurtos, frente a 148 en octubre de 2012 y 187 en enero de 2013, una caída que sugiere un problema de registro) y abril de 2020 (21 hurtos, por el aislamiento obligatorio). Hay además dos cambios de nivel candidatos: la caída de 2014 y el aumento de 2017, año en que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual restaron comparabilidad a la serie [@rodriguez2018]. La estacionalidad es débil; la sección de solución la cuantifica.
+
+# Usuario y práctica vigente
+
+El usuario es el área actuarial de una aseguradora de automóviles, y su decisión es la tarifa de la cobertura de hurto en la renovación anual de las pólizas. La prima de riesgo de esa cobertura depende de la frecuencia esperada de hurto durante el año de vigencia, de modo que el pronóstico de uno a los doce meses siguientes informa la prima y el presupuesto de siniestros. Si la frecuencia se subestima, la prima resulta insuficiente y la cartera pierde dinero; si se sobreestima, la prima pierde competitividad y equidad. La ley exige que las tarifas cumplan los principios de equidad y suficiencia y se basen en información estadística homogénea y representativa [@eosf1993, art. 184].
+
+La práctica actuarial documentada proyecta la frecuencia al periodo de vigencia ajustando una tendencia lineal o exponencial a la historia; en líneas de cola corta, como los daños a automóviles, se usan totales de doce meses móviles para suavizar la estacionalidad [@werner2016, cap. 6].
+
+El pronóstico se entrega al área actuarial como un factor de tendencia: el total de hurtos pronosticado para los doce meses siguientes dividido entre el total observado en los doce meses anteriores. Ese factor, con su intervalo, se aplica a la frecuencia de hurto de la propia cartera, que es el papel que hoy cumple la tendencia lineal. La serie abarca quince años y registra entre 70 y 100 hurtos al mes desde 2014, mientras que la experiencia de una sola aseguradora es una fracción de esos casos y la precisión de los pronósticos de delitos depende sobre todo del nivel de los conteos [@gorr2002].
+
+# Sobre el resultado
+
+Si la respuesta es afirmativa, el área actuarial puede reemplazar el factor de tendencia lineal por el factor que se obtiene del SARIMA. Si es negativa, el área actuarial conserva la tendencia lineal o, si la validación muestra que el naive estacional o Holt–Winters la superan, adopta ese método más simple.
+
+# Pregunta de investigación
+
+*¿En qué medida un modelo SARIMA reduce el error absoluto medio escalado (MASE) del pronóstico del total de los doce meses siguientes de hurtos de automóviles denunciados en Medellín, construido con la serie mensual, frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles con que hoy se proyecta la frecuencia, para la tarifa de la cobertura de hurto que fija el área actuarial de una aseguradora de automóviles en la renovación anual?*
+
+La métrica que decide la respuesta es el MASE del total de los doce meses siguientes, porque ese total es la cantidad que entra en la tarifa como factor de tendencia. Su escalador es el error absoluto medio, en la muestra de entrenamiento, del naive estacional del total, que repite el total de los doce meses anteriores. El MASE y el RMSE por horizonte, de 1 a 12 meses, son complementarios. Se utiliza el MASE porque, a diferencia del MAPE, no se indefine con valores cercanos a cero ni trata de forma asimétrica los errores por exceso y por defecto [@hyndman2006].
+
+**Criterio de respuesta**. Diremos que el SARIMA mejora el pronóstico si su MASE del total de doce meses, promediado sobre los 73 orígenes de la validación, es menor que el de cada uno de los tres referentes y si la prueba de Diebold y Mariano con la corrección de Harvey, Leybourne y Newbold, aplicada a los errores absolutos del total con una varianza robusta al solapamiento de los horizontes, rechaza al 5 % la igualdad de precisión frente a cada referente. En otro caso la respuesta es negativa y se reporta así, sin cambiar de modelo.
+
+# Objetivo general
+
+Determinar en qué medida un modelo SARIMA reduce el MASE del pronóstico del total de doce meses de hurtos de automóviles denunciados en Medellín frente al naive estacional, al suavizamiento de Holt–Winters y a la tendencia lineal sobre totales de doce meses móviles, mediante validación de origen móvil sobre la serie mensual de enero de 2011 a diciembre de 2025.
+
+# Objetivos específicos
+
+1.  Caracterizar la tendencia, la estacionalidad, los atípicos y los cambios de nivel de la serie mensual. Producto: descomposición STL, índices estacionales y tabla de atípicos e intervenciones.
+
+2.  Determinar la transformación y el orden de integración regular y estacional. Producto: $\lambda$ de Box y Cox estimado en entrenamiento y tabla de las pruebas ADF, PP, KPSS y de raíz estacional.
+
+3.  Estimar por máxima verosimilitud y diagnosticar los SARIMA candidatos con intervenciones, y la versión con desempleo como regresión con errores SARIMA. Producto: tabla de coeficientes con errores estándar, criterios de información y diagnóstico de residuos.
+
+4.  Comparar la precisión del SARIMA con la de los tres referentes en origen móvil, con entrenamiento inicial de enero de 2011 a diciembre de 2018 (96 meses) y 73 orígenes, de diciembre de 2018 a diciembre de 2024. Producto: MASE del total y error del factor de tendencia, MASE y RMSE por horizonte, cobertura empírica al 80 y al 95 % (gaussiana y por bootstrap), Diebold y Mariano frente a cada referente, Clark y West para la covariable, sensibilidad a la ventana (creciente frente a fija de 96 meses) y a excluir los orígenes cuyo horizonte incluye 2020, y veredicto.
+
+5.  Implementar el pronóstico en una herramienta que el área actuarial pueda consultar sin asistencia. Producto: aplicación Shiny que recibe la fecha de corte y el horizonte y devuelve el pronóstico mensual, el total de doce meses y el factor de tendencia con sus intervalos, e informe Quarto parametrizado.
+
+# Revisión de literatura
+
+## Búsqueda y criterios
+
+La búsqueda se hizo en Google Scholar, SciELO, Redalyc, la biblioteca del National Criminal Justice Reference Service, CrimRxiv, arXiv y los repositorios de EAFIT, la Universidad Tecnológica de Pereira y la Universidad Nacional, con la cadena («crime» OR «theft» OR «robbery» OR «hurto» OR «robo») AND («forecast*» OR «pronóstic*» OR «time series» OR «ARIMA» OR «SARIMA» OR «exponential smoothing»), y se completó rastreando las citas de las fuentes centrales.
+
+Se incluyen trabajos publicados desde 2000 que pronostican conteos de delitos con métodos de series de tiempo o de aprendizaje automático y reportan al menos una medida cuantitativa de error o de ajuste, con texto completo de acceso libre, para que cualquier lector pueda verificarlos. Se incluyen además dos fuentes colombianas que no pronostican pero fundamentan decisiones del diseño: la frecuencia del hurto de vehículos asegurados y el cambio de registro de 2017. Se excluyen los trabajos descriptivos sin medida de error, los que pronostican series anuales nacionales y los que no tienen texto completo de acceso libre. Quedan nueve fuentes, seis de ellas arbitradas o documentos institucionales.
+
+## Lectura de las fuentes
+
+Los dos informes del grupo de Gorr para el Instituto Nacional de Justicia de Estados Unidos son la evidencia más directa sobre pronóstico mensual de delitos con validación de origen móvil. @gorr2002 pronostican a un mes delitos por precinto en Pittsburgh: el suavizamiento de Holt con estacionalidad estimada para toda la ciudad fue el mejor método, el naive del mismo mes del año anterior tuvo errores en promedio un 37 % mayores, y con 30 o más delitos al mes el MAPE ronda el 20 %. @cohen2005 amplían el diseño a Pittsburgh y Rochester con quince métodos y confirman que el suavizamiento exponencial con estacionalidad agrupada es el mejor en promedio, mientras que los modelos de indicadores líderes solo ganan al anticipar cambios grandes.
+
+@ashby2023 compara diez métodos en doce ciudades con 48 orígenes móviles y encuentra que la combinación de ETS, modelo lineal, naive estacional y STL supera al naive a horizontes largos. @ashby2020 es la única fuente que modela el robo de vehículos con SARIMA, pero lo usa como contrafactual de 2020 y reporta el MASE dentro de muestra. @hahn2023 ajusta SARIMA a conteos mensuales con una sola partición de prueba, y @guerra2024 elige automáticamente entre suavizamiento y SARIMA para el hurto a personas en Medellín. @perez2025 muestran que, con conteos semanales pequeños por comuna, las redes recurrentes reducen el RMSE medio frente a ARIMA, sin prueba formal de la diferencia.
+
+En el dominio colombiano, @medina2017 modelan la frecuencia mensual del hurto de vehículos asegurados con una binomial negativa y la proyectan sin validación fuera de muestra, y @rodriguez2018 documentan que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual, desde 2017, aumentaron las cifras registradas sin que necesariamente aumentara el delito.
+
+La referencia @personeria2015 analiza el impacto de las políticas y estrategias públicas de seguridad implementadas en Medellín entre 2011 y 2015. En ese periodo, se identificaron cambios sustanciales en la dinámica de los hurtos de automotores, cuya disminución se relacionó con medidas como el aumento del pie de fuerza, la implementación de cuadrantes y la renovación de la infraestructura.
+
+La tabla 1 resume las nueve fuentes. La literatura también da una referencia para calibrar el resultado propio: a un mes, el MAPE de los conteos mensuales de delitos ronda el 20 % en unidades con unos 30 delitos al mes [@gorr2002], el menor MAPE de los delitos contra la propiedad por precinto es de 9,4 a 10,5 % [@cohen2005], y a nivel de ciudad el error ponderado de la mejor combinación es del 6,6 % [@ashby2023]. La serie de Medellín, con 70 a 100 hurtos al mes desde 2014, está en el rango de conteos en que esos errores se obtuvieron, aunque las métricas no son directamente comparables con el MASE.
+
+## Brecha
+
+La literatura revisada establece que, a un mes, los métodos con modelo superan a los ingenuos en el pronóstico mensual de delitos, que el suavizamiento exponencial con estacionalidad es el referente más difícil de superar y que la precisión depende sobre todo del nivel de los conteos [@gorr2002; @cohen2005; @ashby2023]. No resuelve, en cambio, tres cosas que importan para la tarifa. Ninguna fuente pronostica el hurto de automóviles fuera de muestra como serie principal: @ashby2020 lo modela, pero solo como contrafactual y con un error dentro de muestra. Ninguna compara contra la tendencia lineal sobre totales de doce meses que usa la tarificación ni evalúa el total anual que entra en la prima. Y la evaluación es débil en las tres piezas que este curso exige: solo tres fuentes usan origen móvil, ninguna usa el MASE fuera de muestra ni la prueba de Diebold y Mariano, y solo @hahn2023 revisa si los valores observados caen en los intervalos, sobre seis meses. Este trabajo se ubica en ese vacío: mantiene el SARIMA y el suavizamiento exponencial, sobre los que hay consenso, y concentra el aporte en evaluarlos contra el referente de la decisión actuarial, a horizontes de 1 a 12 meses y en el total anual, con MASE, Diebold y Mariano, cobertura empírica y el tratamiento explícito del cambio de registro documentado por @rodriguez2018.
+
+## Tabla 1: Comparación de las fuentes revisadas
+
+| Fuente (tipo) | Datos | Método | Horizonte | Métrica | Resultado reportado |
+|:-----------|:-----------|:-----------|:-----------|:-----------|:-----------|
+| @gorr2002 (informe institucional) | Pittsburgh, 6 precintos y 141 celdas; agresiones, robos, allanamientos; mensual, 1990--1998 | Naive, naive del año anterior, suavizamiento simple y de Holt con estacionalidad por precinto o agrupada; regresión y red neuronal | 1 mes; 36 pronósticos en origen móvil, 1996--1998 | MAPE; pruebas t pareadas | Holt con estacionalidad agrupada es el mejor; naive del año anterior con errores un 37 % mayores; MAPE cercano al 20 % con 30 o más delitos al mes |
+| @cohen2005 (informe institucional) | Pittsburgh 1990--2001 y Rochester 1991--2001; delitos contra la propiedad y violentos; mensual; precintos a sectores censales | 15 métodos: naive, suavizamiento exponencial con estacionalidad agrupada, indicadores líderes, redes neuronales | 1 mes; origen móvil, 1995--2001 | MAPE y MSE | Suavizamiento con estacionalidad agrupada por ciudad, el mejor; menor MAPE de delitos contra la propiedad por precinto 9,4 % (Pittsburgh) y 10,5 % (Rochester) |
+| @ashby2023 (preprint) | 12 ciudades de EE. UU., delitos registrados, mensual y diario, 2010--2019 | 10 métodos: naive, naive estacional, STL, ETS, lineal, ARIMA, red neuronal, Prophet, FASSTER y combinación | 36 meses, 90 días y 12 meses; 48 orígenes móviles, entrenamiento de 3 años | WAPE | Combinación 6,6 % frente a naive 10,0 % a 36 meses; 20,4 % a 12 meses por distrito |
+| @ashby2020 (arbitrada) | 16 ciudades de EE. UU., seis delitos incluido el robo de vehículos; semanal, 2016--2020 | SARIMA seleccionado por AIC, como contrafactual de 2020 | Semanas de 2020, intervalos al 99 % | MASE dentro de muestra frente al naive de la semana anterior | Robo de vehículos: MASE entre 0,41 y 0,58 en 13 ciudades; no reporta error fuera de muestra |
+| @hahn2023 (preprint) | California, agresiones agravadas por tipo de arma; mensual, 2005--2019 | SARIMA sobre logaritmos | 6 meses; una partición final | Error relativo mensual; intervalos al 90 % | Errores dentro del 10 %, la mayoría bajo el 5 % |
+| @perez2025 (arbitrada) | Bucaramanga, 17 comunas, hurtos; semanal, 2016--2022 | ARIMA, red recurrente y LSTM | Unas 10 semanas de prueba | RMSE; SMAPE | RMSE medio: LSTM 2,88, red recurrente 3,10, ARIMA 3,43; sin prueba de significancia |
+| @guerra2024 (tesis de maestría) | Medellín, hurto a personas por ciudad, comuna y barrio; mensual, 2017--2024 | Competencia automática entre suavizamiento exponencial, ARIMA y SARIMA | 3 meses | R^2^, MAE, MAPE | A nivel de ciudad gana Winters aditivo, con MAPE cercano al 7 % |
+| @medina2017 (arbitrada) | Colombia, hurto de vehículos asegurados, datos de Fasecolda 2006--2012 | Binomial negativa para la frecuencia mensual, severidad continua, Montecarlo | Un mes | VaR al 95 % | Bogotá y Medellín con la mayor pérdida esperada; sin validación fuera de muestra |
+| @rodriguez2018 (arbitrada, institucional) | Colombia, registros SIEDCO y SPOA y denuncia virtual | Comparación de registros con fuentes alternativas | No reporta | No reporta | La integración de 2017 aumentó las cifras registradas sin que necesariamente aumentara el delito |
+
+
+# Marco teórico
+
+La tabla 2 fija la notación que se usa en el resto del documento. Las definiciones y los resultados siguen el orden en que se aplican en la solución: transformación, orden de integración, identificación, estimación, diagnóstico, pronóstico y evaluación.
+
+: Tabla 2: Notación
+
+| Símbolo | Significado |
+|:---|:---|
+| $y_t$ | Hurtos de automóviles denunciados en Medellín en el mes $t$ |
+| $T$ | Número de meses de la muestra |
+| $w_t = g_\lambda(y_t)$ | Serie transformada con Box–Cox de parámetro $\lambda$ |
+| $B$ | Operador de rezago: $B y_t = y_{t-1}$ |
+| $\nabla = 1 - B$, $\nabla_{12} = 1 - B^{12}$ | Diferencia regular y diferencia estacional |
+| $d$, $D$ | Órdenes de diferenciación regular y estacional |
+| $\phi(B)$, $\theta(B)$ | Polinomios autorregresivo y de medias móviles regulares, de grados $p$ y $q$ |
+| $\Phi(B^{12})$, $\Theta(B^{12})$ | Polinomios autorregresivo y de medias móviles estacionales, de grados $P$ y $Q$ |
+| $\varepsilon_t$ | Innovación: ruido blanco de media cero y varianza $\sigma^2$ |
+| $I^{(i)}_t$, $\omega_i$ | Variable de intervención $i$ y su efecto |
+| $\rho(k)$, $r_k$ | Autocorrelación teórica y muestral en el rezago $k$ |
+| $K$ | Número de parámetros AR y MA estimados, $K = p + q + P + Q$ |
+| $t_0$, $n_0$ | Origen de pronóstico y tamaño del entrenamiento inicial ($n_0 = 96$) |
+| $h$ | Horizonte de pronóstico, de 1 a 12 meses |
+| $\hat y_{t_0+h \mid t_0}$, $e_{t_0,h}$ | Pronóstico hecho en $t_0$ para $t_0+h$ y su error, $e_{t_0,h} = y_{t_0+h} - \hat y_{t_0+h \mid t_0}$ |
+| $M_t$ | Total de 12 meses móviles: $M_t = \sum_{j=0}^{11} y_{t-j}$ |
+| $n_w$ | Número de totales móviles con que se ajusta la tendencia lineal ($n_w = 36$) |
+| $S_{t_0}$, $\hat S_{t_0}$ | Total de los 12 meses siguientes, $S_{t_0} = \sum_{h=1}^{12} y_{t_0+h} = M_{t_0+12}$, y su pronóstico |
+| $F_{t_0}$ | Factor de tendencia: $F_{t_0} = \hat S_{t_0} / M_{t_0}$ |
+| $q_{t_0}$, $q^S_{t_0}$ | Escaladores del MASE por horizonte y del MASE del total |
+| $N$ | Número de orígenes de la validación ($N = 73$) |
+| $d_{t_0}$ | Diferencial de pérdida de la prueba de Diebold y Mariano |
+
+## Estacionariedad y autocorrelación
+
+Un proceso $\{Y_t\}$ es débilmente estacionario si su media $E(Y_t) = \mu$ y sus autocovarianzas $\gamma(k) = \operatorname{Cov}(Y_t, Y_{t+k})$ no dependen de $t$. Su función de autocorrelación (ACF) es $\rho(k) = \gamma(k)/\gamma(0)$, y su función de autocorrelación parcial (PACF) en el rezago $k$ es la correlación entre $Y_t$ y $Y_{t+k}$ una vez se elimina el efecto lineal de $Y_{t+1}, \dots, Y_{t+k-1}$; se calcula a partir de la ACF con la recursión de Durbin y Levinson. La ACF muestral es
+
+$$
+r_k = \frac{\sum_{t=1}^{T-k} (y_t - \bar y)(y_{t+k} - \bar y)}{\sum_{t=1}^{T} (y_t - \bar y)^2}.
+$$
+
+Si la serie es ruido blanco, cada $r_k$ se distribuye aproximadamente como $N(0, 1/T)$, de modo que las bandas $\pm 1{,}96/\sqrt{T}$ delimitan los valores compatibles con la ausencia de autocorrelación al 95 % [@fpp3, secs. 2.8 y 2.9]. En la identificación, una ACF que se corta después del rezago $q$ y una PACF que decae sugieren una componente de medias móviles de orden $q$, y el patrón inverso sugiere una autorregresiva [@fpp3, sec. 9.5].
+
+El operador de rezago $B$ permite escribir las diferencias como polinomios: $\nabla y_t = (1 - B) y_t = y_t - y_{t-1}$ y $\nabla_{12} y_t = (1 - B^{12}) y_t = y_t - y_{t-12}$ [@fpp3, sec. 9.2].
+
+## Transformación de Box y Cox
+
+Para estabilizar la varianza se usa la familia de Box y Cox [@box1964; @fpp3, sec. 3.1]:
+
+$$
+w_t = g_\lambda(y_t) = \begin{cases} \log y_t, & \lambda = 0, \\ (y_t^\lambda - 1)/\lambda, & \lambda \neq 0. \end{cases}
+$$
+
+El método de @guerrero1993 elige $\lambda$ de modo que el cociente entre la desviación estándar y la media elevada a $1 - \lambda$ sea lo más constante posible entre subseries anuales. Como criterio alterno, si $w_t$ sigue un modelo gaussiano con log-verosimilitud $\ell_w(\lambda)$, el cambio de variable de $w$ a $y$ multiplica la densidad por el jacobiano $\prod_t \lvert dw_t/dy_t \rvert = \prod_t y_t^{\lambda - 1}$, de modo que la log-verosimilitud en la escala original es
+
+$$
+\ell_y(\lambda) = \ell_w(\lambda) + (\lambda - 1) \sum_{t=1}^{T} \log y_t .
+$$
+
+Solo $\ell_y$ es comparable entre valores distintos de $\lambda$, porque $\ell_w$ está medida en escalas distintas. Ambos criterios usan únicamente la muestra de entrenamiento.
+
+## Orden de integración
+
+Las pruebas de raíz unitaria deciden el número de diferencias regulares $d$. La prueba aumentada de Dickey y Fuller (ADF) ajusta por mínimos cuadrados
+
+$$
+\nabla w_t = \alpha + \gamma\, w_{t-1} + \sum_{j=1}^{k} \delta_j \nabla w_{t-j} + u_t ,
+$$
+
+con $k$ elegido por el criterio de Akaike, y contrasta $H_0\colon \gamma = 0$ (raíz unitaria) frente a $H_1\colon \gamma < 0$. Bajo $H_0$ el estadístico $\tau = \hat\gamma/\operatorname{ee}(\hat\gamma)$ no sigue una $t$ de Student, sino la distribución no estándar que estudiaron @dickey1979; con constante y unas cien observaciones, su valor crítico al 5 % es $-2{,}89$. La prueba de @phillips1988 (PP) tiene la misma hipótesis nula, pero en lugar de agregar rezagos corrige el estadístico de forma no paramétrica con una estimación de la varianza de largo plazo con núcleo de Bartlett. La prueba KPSS invierte las hipótesis: descompone $w_t = r_t + u_t$, con $r_t = r_{t-1} + v_t$ un paseo aleatorio y $u_t$ estacionario, y contrasta $H_0\colon \operatorname{Var}(v_t) = 0$ (estacionariedad alrededor de un nivel) con el estadístico
+
+$$
+\eta = \frac{1}{T^2 \hat\sigma^2_{\text{LP}}} \sum_{t=1}^{T} \Big( \sum_{s=1}^{t} \hat u_s \Big)^2 ,
+$$
+
+donde $\hat u_s$ son las desviaciones respecto a la media y $\hat\sigma^2_{\text{LP}}$ es la varianza de largo plazo [@kwiatkowski1992; @fpp3, sec. 9.1]. Como las nulas son opuestas, la decisión es más firme cuando ADF y PP no rechazan y KPSS sí rechaza en el nivel, y lo contrario ocurre en la primera diferencia.
+
+Para la diferencia estacional $D$ se usa la fuerza estacional de la descomposición STL [@fpp3, sec. 3.6], que separa la serie en tendencia $\tau_t$, componente estacional $s_t$ y resto $R_t$:
+
+$$
+F_S = \max\left(0,\; 1 - \frac{\operatorname{Var}(R_t)}{\operatorname{Var}(s_t + R_t)}\right).
+$$
+
+Se toma una diferencia estacional si $F_S \geq 0{,}64$, y ninguna en caso contrario [@fpp3, secs. 4.3 y 9.1]. Los criterios de información no sirven para elegir $d$ ni $D$, porque la diferenciación cambia los datos sobre los que se calcula la verosimilitud [@fpp3, sec. 9.6].
+
+## Modelo SARIMA con intervenciones
+
+La serie transformada sigue un modelo SARIMA$(p,d,q)(P,D,Q)_{12}$ si
+
+$$
+\phi(B)\, \Phi(B^{12})\, \nabla^d \nabla_{12}^D\, w_t = c + \theta(B)\, \Theta(B^{12})\, \varepsilon_t ,
+$$
+
+donde $\phi(B) = 1 - \phi_1 B - \dots - \phi_p B^p$, $\Phi(B^{12}) = 1 - \Phi_1 B^{12} - \dots - \Phi_P B^{12P}$, $\theta(B) = 1 + \theta_1 B + \dots + \theta_q B^q$, $\Theta(B^{12}) = 1 + \Theta_1 B^{12} + \dots + \Theta_Q B^{12Q}$ y $\varepsilon_t$ es ruido blanco gaussiano [@fpp3, sec. 9.9]. La serie diferenciada es estacionaria y causal si todas las raíces de $\phi(z)\Phi(z^{12}) = 0$ están fuera del círculo unitario, y el modelo es invertible si lo están las de $\theta(z)\Theta(z^{12}) = 0$ [@fpp3, secs. 9.4 y 9.7]. La invertibilidad garantiza que las innovaciones se puedan recuperar de los datos observados; una raíz de medias móviles sobre el círculo unitario indica que la serie se diferenció de más.
+
+Los atípicos y los cambios de nivel se incorporan como una regresión con errores SARIMA,
+
+$$
+w_t = \sum_{i} \omega_i I^{(i)}_t + \eta_t ,
+$$
+
+donde $\eta_t$ sigue el modelo anterior. Un atípico aditivo (AO) en el mes $\tau_i$ usa $I^{(i)}_t = 1$ si $t = \tau_i$ y $0$ en otro caso; un cambio de nivel (LS) usa $I^{(i)}_t = 1$ si $t \geq \tau_i$ y $0$ en otro caso [@chen1993]. Con $w_t = \log y_t$, el efecto de un atípico aditivo equivale a multiplicar el valor del mes por $e^{\omega_i}$. Al estimar, las diferencias se aplican tanto a $w_t$ como a las variables de intervención, de modo que con $d = 1$ un cambio de nivel se convierte en un pulso [@fpp3, secs. 10.1 y 10.2].
+
+## Estimación y selección
+
+Los parámetros se estiman por máxima verosimilitud gaussiana [@fpp3, sec. 9.6]. Si el modelo está bien especificado y es causal e invertible, el estimador es consistente y asintóticamente normal, y sus errores estándar se obtienen de la inversa de la hessiana de la log-verosimilitud en el máximo. Entre modelos con los mismos $d$ y $D$, y por tanto con la misma muestra efectiva, se compara el criterio de Akaike corregido,
+
+$$
+\text{AICc} = -2 \log L + 2k + \frac{2k(k+1)}{T^* - k - 1},
+$$
+
+donde $k$ es el número de parámetros estimados, incluida la varianza, y $T^*$ el número de observaciones después de diferenciar [@fpp3, sec. 9.6].
+
+## Diagnóstico de los residuos
+
+Si el modelo es adecuado, los residuos $\hat\varepsilon_t$ deben comportarse como ruido blanco. La prueba de @ljung1978 usa
+
+$$
+Q^* = T^*(T^* + 2) \sum_{k=1}^{\ell} \frac{r_k^2}{T^* - k},
+$$
+
+con $r_k$ la autocorrelación de los residuos, y bajo $H_0$ (residuos incorrelacionados hasta el rezago $\ell$) se distribuye aproximadamente como $\chi^2_{\ell - K}$ [@fpp3, sec. 9.7]. La prueba de @mcleod1983 aplica el mismo estadístico a los residuos al cuadrado, sin restar grados de libertad, y detecta heterocedasticidad condicional. La normalidad, que sustenta los intervalos gaussianos, se contrasta con la prueba de @shapiro1965 y con la de @jarque1987,
+
+$$
+JB = \frac{T^*}{6}\left[ A^2 + \frac{(C - 3)^2}{4} \right],
+$$
+
+donde $A$ y $C$ son la asimetría y la curtosis muestrales de los residuos; bajo normalidad $JB$ se distribuye asintóticamente como $\chi^2_2$. Un residuo estandarizado con valor absoluto mayor que 3 se trata como atípico remanente.
+
+## Pronóstico puntual y por intervalos
+
+El predictor de $w_{t_0+h}$ que minimiza el error cuadrático medio es la esperanza condicional $\hat w_{t_0+h \mid t_0} = E(w_{t_0+h} \mid w_1, \dots, w_{t_0})$. Si $\psi_0 = 1, \psi_1, \psi_2, \dots$ son los pesos de la representación de medias móviles del modelo, la varianza del error a $h$ pasos es
+
+$$
+\sigma_h^2 = \sigma^2 \sum_{j=0}^{h-1} \psi_j^2 ,
+$$
+
+y con innovaciones gaussianas el intervalo de probabilidad $1 - \alpha$ es $\hat w_{t_0+h \mid t_0} \pm z_{1-\alpha/2}\, \hat\sigma_h$ [@fpp3, sec. 9.8]. El intervalo para $y$ se obtiene aplicando $g_\lambda^{-1}$ a los extremos. Con el logaritmo, $\exp(\hat w_{t_0+h \mid t_0})$ es la mediana del pronóstico y no su media; la media aproximada es $\exp(\hat w_{t_0+h \mid t_0})\,(1 + \hat\sigma_h^2/2)$ [@fpp3, sec. 5.6]. Si la normalidad no se sostiene, los intervalos se construyen por bootstrap, simulando trayectorias futuras con residuos remuestreados [@fpp3, sec. 5.5]. Ninguno de los dos intervalos incorpora la incertidumbre de los parámetros. El total $\hat S_{t_0}$ suma pronósticos con errores correlacionados, por lo que su distribución se obtiene sumando las trayectorias simuladas, y de ella sale también el intervalo del factor de tendencia $F_{t_0}$.
+
+## Referentes
+
+El **naive estacional** pronostica $\hat y_{t_0+h \mid t_0} = y_{t_0+h-12}$ para $h \leq 12$ [@fpp3, sec. 5.2]; su total es $\hat S_{t_0} = M_{t_0}$, de modo que su factor de tendencia es siempre 1.
+
+El **suavizamiento de Holt y Winters** aditivo actualiza un nivel $\ell_t$, una pendiente $b_t$ y un componente estacional $s_t$:
+
+$$
+\begin{aligned}
+\ell_t &= \alpha (y_t - s_{t-12}) + (1 - \alpha)(\ell_{t-1} + b_{t-1}), \\
+b_t &= \beta^* (\ell_t - \ell_{t-1}) + (1 - \beta^*) b_{t-1}, \\
+s_t &= \gamma (y_t - \ell_{t-1} - b_{t-1}) + (1 - \gamma) s_{t-12},
+\end{aligned}
+$$
+
+y pronostica $\hat y_{t_0+h \mid t_0} = \ell_{t_0} + h b_{t_0} + s_{t_0+h-12}$ para $h \leq 12$; la versión multiplicativa divide por el componente estacional en lugar de restarlo [@fpp3, sec. 8.3]. Los parámetros se estiman por máxima verosimilitud en la forma de espacio de estados [@fpp3, secs. 8.5 y 8.6].
+
+La **tendencia lineal sobre totales de 12 meses móviles** reproduce la práctica actuarial [@werner2016, cap. 6]. En cada origen se ajusta por mínimos cuadrados la recta $M_t = a + b\,t$ sobre los últimos $n_w = 36$ totales móviles disponibles, $t = t_0 - 35, \dots, t_0$, y se proyecta al final del año siguiente: $\hat S_{t_0} = \hat a + \hat b\,(t_0 + 12)$. La ventana de tres años da suficientes puntos para estimar la pendiente sin que la recta quede dominada por la caída de nivel de 2011–2014, que ya no representa el nivel reciente de la serie; se fijó antes de la validación y no se ajusta con sus resultados. Como los totales consecutivos comparten 11 meses, los residuos de la recta están autocorrelacionados; esto no afecta al pronóstico puntual, que es lo único que se usa del referente.
+
+## Evaluación fuera de muestra
+
+La validación usa origen móvil: para cada $t_0 = n_0, \dots, n_0 + N - 1$, cada método se estima solo con $y_1, \dots, y_{t_0}$ y pronostica $h = 1, \dots, 12$ [@fpp3, sec. 5.10]. Todo lo que depende de los datos, incluidos $\lambda$ y los escaladores, se calcula dentro de cada entrenamiento.
+
+El **MASE por horizonte** escala cada error absoluto por el error medio del naive estacional en el entrenamiento [@hyndman2006; @fpp3, sec. 5.8]:
+
+$$
+q_{t_0} = \frac{1}{t_0 - 12} \sum_{t=13}^{t_0} \lvert y_t - y_{t-12} \rvert, \qquad
+\text{MASE}_h = \frac{1}{N} \sum_{t_0} \frac{\lvert e_{t_0,h} \rvert}{q_{t_0}} .
+$$
+
+El **MASE del total** aplica la misma idea a la cantidad que entra en la tarifa. Su escalador es el error medio en el entrenamiento del naive estacional del total, que repite el total de los 12 meses anteriores:
+
+$$
+q^S_{t_0} = \frac{1}{t_0 - 23} \sum_{t=24}^{t_0} \lvert M_t - M_{t-12} \rvert, \qquad
+\text{MASE}_S = \frac{1}{N} \sum_{t_0} \frac{\lvert S_{t_0} - \hat S_{t_0} \rvert}{q^S_{t_0}} .
+$$
+
+Un MASE menor que 1 indica que el método supera, fuera de muestra, al naive estacional medido dentro del entrenamiento. El RMSE por horizonte, $\text{RMSE}_h = \big(N^{-1} \sum_{t_0} e_{t_0,h}^2\big)^{1/2}$, complementa al MASE en la escala de los hurtos.
+
+La **cobertura empírica** de un intervalo de nivel nominal $c$ es la proporción $\hat c$ de orígenes en que el valor observado cae dentro del intervalo. Si los $N$ orígenes fueran independientes, su error estándar sería $\sqrt{c(1-c)/N}$, unos 0,026 para $c = 0{,}95$ y $N = 73$; como los horizontes de orígenes vecinos se solapan, el error real es mayor.
+
+La **prueba de Diebold y Mariano** compara dos métodos $A$ y $B$ a través del diferencial de pérdida $d_{t_0} = \lvert e^A_{t_0} \rvert - \lvert e^B_{t_0} \rvert$, que usa la misma pérdida absoluta del MASE. Si $\{d_{t_0}\}$ es estacionaria en covarianza y de memoria corta, el estadístico
+
+$$
+S_1 = \frac{\bar d}{\sqrt{\hat V / N}}, \qquad \hat V = \sum_{\lvert \tau \rvert \leq h-1} \hat\gamma_d(\tau),
+$$
+
+con ventana rectangular de $h - 1$ rezagos porque los errores óptimos a $h$ pasos son a lo sumo $(h-1)$-dependientes, es asintóticamente $N(0,1)$ bajo $H_0\colon E(d_{t_0}) = 0$ [@diebold1994, sec. 2.1]. En muestras pequeñas se usa la corrección de @harvey1997,
+
+$$
+S_1^* = S_1 \sqrt{\frac{N + 1 - 2h + h(h-1)/N}{N}},
+$$
+
+comparada con una $t$ de Student con $N - 1$ grados de libertad. La alternativa es unilateral, $H_1\colon E(d_{t_0}) < 0$ con $A$ = SARIMA, es decir, que el SARIMA es más preciso. Para el total de 12 meses, $h = 12$: orígenes consecutivos comparten 11 de sus 12 meses, la información efectiva equivale a unos seis años independientes y la prueba tiene poca potencia; no rechazar $H_0$ no prueba que los métodos sean igual de precisos.
+
+Cuando un modelo anida a otro, como el SARIMA con desempleo frente al SARIMA sin covariable, el estimador de los parámetros extra añade ruido bajo $H_0$ y la prueba anterior queda sesgada contra el modelo grande. La prueba de Clark y West corrige ese sesgo con
+
+$$
+\hat f_{t_0+h} = (e^1_{t_0,h})^2 - \left[ (e^2_{t_0,h})^2 - (\hat y^1_{t_0+h \mid t_0} - \hat y^2_{t_0+h \mid t_0})^2 \right],
+$$
+
+donde el modelo 1 es el anidado; se rechaza la igualdad de error cuadrático medio a favor del modelo grande si el estadístico $t$ de la media de $\hat f$, con error estándar robusto a autocorrelación, supera 1,645 [@clark2006, sec. 2, ec. (2.1)].
+
+# Referencias
+
+::: {#refs}
+:::
