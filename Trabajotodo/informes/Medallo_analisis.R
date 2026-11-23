@@ -49,7 +49,7 @@ serie_med <- leer_serie(
 
 
 graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026", 
-               color = "#483D8B")
+               color = "#00688B", mostrar_puntos = FALSE)
 
 
 correlograma(serie_med, m = 24)
