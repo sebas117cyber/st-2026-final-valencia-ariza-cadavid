@@ -4,6 +4,12 @@ library(readr)
 library(lubridate)
 library(tidyverse)
 library(plotly)
+library(forecast)
+library(tseries)
+library(TSA)
+library(lmtest)
+library(ggplot2)
+library(patchwork)
 
 Hurtos_ANT <- read_csv("Trabajotodo/base_data/Reporte_Hurto_de_motocicletas_y_automotores_en_el_Departamento_de_Antioquia_-_Policía_Nacional_20260930.csv"
 )
@@ -42,4 +48,12 @@ serie_med <- leer_serie(
 )
 
 
+graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026", 
+               color = "#483D8B")
+
+
+correlograma(serie_med, m = 24)
+
+
+evaluar_boxcox(serie_ts_med)
 

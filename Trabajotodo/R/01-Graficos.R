@@ -5,51 +5,87 @@ library(stats)
 library(patchwork)
 #------------------Grafica de la serie-----------------------------#
 
-graficar_serie <- function(datos, titulo) {
+graficar_serie <- function(datos, titulo, color = "#7AC5CD",
+                           alpha = 0.8, mostrar_puntos = TRUE) {
   
-  #Graficos la series, en esta funcion recibe dos parametros datos y titulo, donde 
-  #datos viene con dos tributos fuente y observacion que se brindan en la funcion de leer_seri
+  # datos: tibble creado con leer_serie()
+  # titulo: título del gráfico
+  # color: color de la línea y los puntos (hexadecimal o nombre de R)
+  # alpha: transparencia entre 0 (invisible) y 1 (opaco)
+  # mostrar_puntos: si es TRUE dibuja puntos sobre la línea
   
   
-  # Sacamos la informacion de fuente y unidad
+  # Validamos que el color sea válido
+  color_ok <- tryCatch(
+    {
+      col2rgb(color)
+      TRUE
+    },
+    error = function(e) FALSE
+  )
+  if (!color_ok) {
+    stop("nombre no es válido. Usa un hexadecimal como '#CD661D' o un nombre de color de R")
+  }
+  
+  # Validamos alpha
+  if (!is.numeric(alpha) || alpha < 0 || alpha > 1) {
+    stop("'alpha' debe ser un número entre 0 y 1")
+  }
+  
+  # Aplicamos la transparencia al color elegido
+  color_final <- adjustcolor(color, alpha.f = alpha)
+  
+  # Información de los atributos
   fuente <- attr(datos, "fuente")
   unidad <- attr(datos, "unidad")
   
-  # Observaciones
+  # Número de observaciones
   n <- nrow(datos)
   
-  # Creamos el grafico 
-  ggplot(datos, aes(x = fecha, y = y)) +
-    geom_line() +
+  # Años de la serie, de 2 en 2
+  anio_ini <- as.numeric(format(min(datos$fecha), "%Y"))
+  anio_fin <- as.numeric(format(max(datos$fecha), "%Y"))
+  anios    <- seq(anio_ini, anio_fin, by = 2)
+  cortes   <- as.Date(paste0(anios, "-01-01"))
+  
+  # Gráfico
+  g <- ggplot(datos, aes(x = fecha, y = y)) +
+    geom_line(color = color_final, linewidth = 1.2)
+  
+  if (mostrar_puntos) {
+    g <- g + geom_point(
+      color = color_final,
+      size  = ifelse(n <= 60, 4, 1.5)
+    )
+  }
+  
+  g +
+    scale_x_date(
+      breaks = cortes,
+      labels = format(cortes, "%Y")
+    ) +
     
     labs(
-      title = titulo,
-      x = "Fecha",
-      y = paste(unidad, sep = ""),
-      caption = paste(
-        "Fuente:", fuente,
-        "| Observaciones:", n
-      )
+      title   = titulo,
+      x       = "Fecha",
+      y       = unidad,
+      caption = paste("Fuente:", fuente, "| Observaciones:", n)
     ) +
     
     theme_minimal() +
     
     theme(
-      plot.title = element_text(
-        size = 16,
-        face = "bold",
-        hjust = 0.5
-      ),
-      axis.title = element_text(
-        face = "bold"
-      ),
-      axis.text.x = element_text(
-        angle = 45,
-        hjust = 1
-      ),
-      plot.caption = element_text(
-        hjust = 0
-      )
+      axis.line   = element_line(color = "black", linewidth = 0.4),
+      axis.ticks  = element_line(color = "black"),
+      
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor   = element_blank(),
+      panel.grid.major.y = element_line(color = "grey85", linewidth = 0.5),
+      
+      plot.title   = element_text(size = 16, face = "bold", hjust = 0.5),
+      axis.title   = element_text(face = "bold"),
+      axis.text.x  = element_text(angle = 0, hjust = 0.5),
+      plot.caption = element_text(hjust = 0)
     )
 }
 
