@@ -61,8 +61,6 @@ mes_texto <- function(m) {
 
 ```
 
-
-
 Universidad Nacional de Colombia, sede Medellín · Departamento de Estadística \| Noviembre de 2026\
 Series de tiempo univariadas, 2026-II · Prof. Juan Pablo Valencia Arango \| Trabajo final
 
@@ -156,15 +154,12 @@ La literatura revisada establece que, a un mes, los métodos con modelo superan 
 | @medina2017 (arbitrada) | Colombia, hurto de vehículos asegurados, datos de Fasecolda 2006--2012 | Binomial negativa para la frecuencia mensual, severidad continua, Montecarlo | Un mes | VaR al 95 % | Bogotá y Medellín con la mayor pérdida esperada; sin validación fuera de muestra |
 | @rodriguez2018 (arbitrada, institucional) | Colombia, registros SIEDCO y SPOA y denuncia virtual | Comparación de registros con fuentes alternativas | No reporta | No reporta | La integración de 2017 aumentó las cifras registradas sin que necesariamente aumentara el delito |
 
-
 # Marco teórico
 
 La tabla 2 fija la notación que se usa en el resto del documento. Las definiciones y los resultados siguen el orden en que se aplican en la solución: transformación, orden de integración, identificación, estimación, diagnóstico, pronóstico y evaluación.
 
-: Tabla 2: Notación
-
 | Símbolo | Significado |
-|:---|:---|
+|:-----------------------------------|:-----------------------------------|
 | $y_t$ | Hurtos de automóviles denunciados en Medellín en el mes $t$ |
 | $T$ | Número de meses de la muestra |
 | $w_t = g_\lambda(y_t)$ | Serie transformada con Box–Cox de parámetro $\lambda$ |
@@ -187,6 +182,8 @@ La tabla 2 fija la notación que se usa en el resto del documento. Las definicio
 | $q_{t_0}$, $q^S_{t_0}$ | Escaladores del MASE por horizonte y del MASE del total |
 | $N$ | Número de orígenes de la validación ($N = 73$) |
 | $d_{t_0}$ | Diferencial de pérdida de la prueba de Diebold y Mariano |
+
+: Tabla 2: Notación
 
 ## Estacionariedad y autocorrelación
 
