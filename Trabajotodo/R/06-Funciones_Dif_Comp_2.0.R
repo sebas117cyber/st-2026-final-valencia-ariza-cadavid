@@ -886,3 +886,17 @@ correlaciones_muestrales <- function(x, rezagos = 15) {
 
 
 
+
+# 2. Identificar diferenciación (d) y patrones de ACF/PACF
+res_id <- identificar_modelo(trans_medallo, rezagos = 24)
+res_id$tabla_df
+res_id$tabla_corr
+
+# 3. Seleccionar candidatos automáticamente según la ACF y PACF
+res_comp <- seleccionar_candidatos(
+  y = trans_medallo,
+  d = res_id$d,
+  graficar = TRUE
+)
+res_comp$tabla
+
