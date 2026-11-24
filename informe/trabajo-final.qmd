@@ -47,6 +47,16 @@ library(patchwork)
 library(tsibble)
 library(fable)
 library(feasts)
+library(readr)
+library(lubridate)
+library(tidyverse)
+library(plotly)
+library(forecast)
+library(tseries)
+library(TSA)
+library(lmtest)
+library(here)
+
 set.seed(20261118)
 
 source(here::here("R", "02-limpieza.R"), encoding = "UTF-8")
@@ -352,6 +362,95 @@ $$
 $$
 
 donde el modelo 1 es el anidado; se rechaza la igualdad de error cuadrático medio a favor del modelo grande si el estadístico $t$ de la media de $\hat f$, con error estándar robusto a autocorrelación, supera 1,645 [@clark2006, sec. 2, ec. (2.1)].
+
+
+# Exploracion inicial de la serie
+
+<!-- [Grafico inicial de la serie Medellin](../Trabajotodo/figs/Grafi_original_medallo.png){width="100%"} -->
+
+```{r, include=FALSE}
+
+Hurtos_ANT <- read_csv("../Trabajotodo/base_data/Reporte_Hurto_de_motocicletas_y_automotores_en_el_Departamento_de_Antioquia_-_Policía_Nacional_20260930.csv"
+)
+
+df_mensual_med <- Hurtos_ANT |> 
+  rename(T_hurto = `TIPO DE HURTO`) |> 
+  filter(T_hurto == "ARTÍCULO 239. HURTO AUTOMOTORES" & MUNICIPIO == "Medellín (CT)") |> 
+  mutate(
+    fecha_dt = dmy(`FECHA HECHO`), 
+    fecha = floor_date(fecha_dt, unit = "month")
+  ) |> 
+  group_by(fecha) |> 
+  summarise(valor = sum(CANTIDAD, na.rm = TRUE), .groups = "drop") |> 
+  arrange(fecha)
+
+anio_inicio <- as.numeric(format(min(df_mensual_med$fecha), "%Y"))
+mes_inicio  <- as.numeric(format(min(df_mensual_med$fecha), "%m"))
+
+
+# serie ts
+
+serie_ts_med <- ts(
+  df_mensual_med$valor,
+  start = c(anio_inicio, mes_inicio),
+  frequency = 12
+)
+
+remove(Hurtos_ANT, df_mensual_med, anio_inicio, mes_inicio)
+
+source("../Trabajotodo/R/00-lectura.R")
+
+serie_med <- leer_serie(
+  x = serie_ts_med,
+  fuente = "datos abiertos col",
+  unidad = "robos reportados de vehiculos"
+)
+
+
+```
+
+```{r, include=FALSE}
+
+source("../Trabajotodo/R/01-Graficos.R")
+
+```
+
+
+```{r, echo=FALSE}
+
+G_originalM <- graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026", 
+               color = "#00688B", mostrar_puntos = FALSE)
+
+G_originalM
+
+```
+
+
+Se observa un aumento pronunciado a partir de 2011. Durante aproximadamente 2011-2013 se alcanzan varios valores superiores a 200 robos mensuales. Posteriormente, la serie presenta una tendencia general descendente hasta alrededor de 2014-2015.Desde 2015 y hasta julio de 2026, los registros se mantienen en un nivel considerablemente inferior al de los años de mayor incidencia y fluctúan, en su mayoría, entre 50 y 100 robos mensuales. No obstante, se presentan picos ocasionales por encima de ese intervalo y algunas caídas pronunciadas, existe un periodo de incremento, otro de descenso y uno posterior de menor nivel. 
+
+Visualmente no se identifica un patrón estacional anual claramente definido, se requieren pruebas para confirmar la no estacionalidad. La dispersión tampoco parece constante a lo largo del periodo. Es mayor durante la etapa de registros elevados de 2011-2013 y, en general, menor después de 2015, aunque persisten variaciones puntuales. Por tanto, la serie no parece estacionaria
+
+Esta serie tiene un cambio de nivel importante entre los años 2010-2014 presentandoce un incremento Amplio para despues disminuir drasticamente y mantener un nivel alrededor de 50 a 100 robos de vehiculos.La serie no presentea estacionalidad grafica y la varianza de los datos es bastante amplia durante todo el tiempo por lo que hay ausencia de varianza constante . Existe presencia de datos atipicos como el caso del mes de abril de 2020 donde se registraron 21 robos debido al inicio de la cuarentena por la pandemia del covid-19 en ese año y en septiembre de 2010 con 41 robos registrados. 
+
+Entre las observaciones que destacan visualmente se encuentran los 41 robos de septiembre de 2010 y, especialmente, los 21 de abril de 2020. Este último dato coincide temporalmente con el inicio de las restricciones de movilidad por la pandemia de COVID-19. Esto ultimo no supone causalidad.
+
+
+```{r, echo=FALSE}
+
+Cor_originalM <- correlograma(serie_med, m = 24)
+Cor_originalM$panel
+
+```
+
+La ACF exhibe un decrecimiento monótono y gradual de forma continua hasta aproximadamente el rezago 17 donde los rezagos deja de ser significativos. Patron característico de no estacionariedad en media, atribuible a la tendencia y a los cambios de nivel identificados y no se observan repuntes destacados en los rezagos múltiplos de la frecuencia temporal (rezagos 12 y 24), lo cual es consistente con la ausencia de un patrón estacional 
+
+La PACF presenta un corte abrupto después del tercer rezago: los tres primeros coeficientes son positivos y estadísticamente significativos, mientras que a partir del rezago 4 la gran mayoría de los valores fluctúa dentro del intervalo de no significancia.
+
+De acuerdo con la metodología de Box-Jenkins, el patrón conjunto de una ACF con decaimiento suave y una PACF que se corta en el rezago p=3 sugiere una estructura autorregresiva de orden tres AR(3) o un ARIMA(p,d,q), se necesitan pruebas para confirmar el modelo adecuado o descartar estas supuestos.
+
+
+La ACF tiene un patro de decrecimiento en un principio lento y decae rapidamente despues del rezago 5. Dando una posibilidad de tendencia, no tiene patron de estacionalidad. La PACF se corta en el rezago 3 antes de hacer ruido blanco proponiendo un posible modelo AR(3).
+
 
 # Referencias
 

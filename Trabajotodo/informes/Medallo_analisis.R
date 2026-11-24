@@ -10,6 +10,8 @@ library(TSA)
 library(lmtest)
 library(ggplot2)
 library(patchwork)
+library(here)
+
 
 Hurtos_ANT <- read_csv("Trabajotodo/base_data/Reporte_Hurto_de_motocicletas_y_automotores_en_el_Departamento_de_Antioquia_-_Policía_Nacional_20260930.csv"
 )
@@ -38,6 +40,7 @@ serie_ts_med <- ts(
   frequency = 12
 )
 
+remove(Hurtos_ANT, df_mensual_med, anio_inicio, mes_inicio)
 
 source("Trabajotodo/R/00-lectura.R")
 
@@ -48,11 +51,11 @@ serie_med <- leer_serie(
 )
 
 
-graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026", 
+G_originalM <- graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026", 
                color = "#00688B", mostrar_puntos = FALSE)
 
 
-correlograma(serie_med, m = 24)
+Cor_originalM <- correlograma(serie_med, m = 24)
 
 
 boxcox_medallo <- evaluar_boxcox(serie_ts_med)
@@ -63,7 +66,22 @@ trans_medallo <- leer_serie(ST_transMedallo,
                             fuente = "datos abiertos col",
                             unidad = "robos reportados de vehiculos")
 
-graficar_serie(trans_medallo, "Reporte de Robos de vehiculos en medellin 2010-2026")
+G_transM <- graficar_serie(trans_medallo, "Reporte de Robos de vehiculos en medellin 2010-2026")
 
 
-correlograma(trans_medallo, m = 24)
+Cor_transM <- correlograma(trans_medallo, m = 24)
+
+#----Diagnostico medallo ----
+
+# 2. Identificar diferenciación (d) y patrones de ACF/PACF
+res_id <- identificar_modelo(trans_medallo, rezagos = 24)
+res_id$tabla_df
+res_id$tabla_corr
+
+# 3. Seleccionar candidatos automáticamente según la ACF y PACF
+res_comp <- seleccionar_candidatos(
+  y = trans_medallo,
+  d = res_id$d,
+  graficar = TRUE
+)
+res_comp$tabla
