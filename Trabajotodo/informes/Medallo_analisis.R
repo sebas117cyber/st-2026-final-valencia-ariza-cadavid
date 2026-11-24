@@ -55,5 +55,15 @@ graficar_serie(serie_med, "Reporte de Robos de vehiculos en medellin 2010-2026",
 correlograma(serie_med, m = 24)
 
 
-evaluar_boxcox(serie_ts_med)
+boxcox_medallo <- evaluar_boxcox(serie_ts_med)
 
+ST_transMedallo <- boxcox_medallo$serie_transformada
+
+trans_medallo <- leer_serie(ST_transMedallo, 
+                            fuente = "datos abiertos col",
+                            unidad = "robos reportados de vehiculos")
+
+graficar_serie(trans_medallo, "Reporte de Robos de vehiculos en medellin 2010-2026")
+
+
+correlograma(trans_medallo, m = 24)
