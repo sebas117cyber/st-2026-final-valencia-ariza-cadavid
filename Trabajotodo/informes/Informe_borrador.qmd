@@ -39,8 +39,6 @@ library(patchwork)
 
 ```
 
-
-
 Universidad Nacional de Colombia, sede Medellín · Departamento de Estadística \| Noviembre de 2026\
 Series de tiempo univariadas, 2026-II · Prof. Juan Pablo Valencia Arango \| Trabajo final
 
@@ -55,7 +53,6 @@ Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valen
 La serie es muestra el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Antioquia, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos (Policía Nacional de Colombia, 2026); la serie es mensual, se obtiene con código en R contando los registros de cada mes. El conjunto cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal.
 
 El nivel cambia por tramos: cerca de 200 hurtos por mes en 2011–2013, entre 110 y 130 en 2014–2021, alrededor de 150 en 2022–2024 y 123 en 2025. Hay datos atípicos presentes en los años 2012 y 2020 donde se reducen los hurtos, ademas hay posibles cambios de nivel que se tratarán como intervenciones: noviembre y diciembre de 2012 (72 y 102 hurtos, con una caída que sugiere un problema de registro), la caída de 2014, la integración de los registros de la Policía y la Fiscalía y la denuncia virtual en 2017, que según @rodriguez2018 restaron comparabilidad a la serie, y abril de 2020 (34 hurtos, por el aislamiento obligatorio). La estacionalidad es débil: entre 2014 y 2019 el índice mensual va de 0,90 en diciembre a 1,06 en noviembre.
-
 
 Al explorar la base de datos, se observa que la mayoría de los hurtos de automotores ocurren en el Valle de Aburrá, especialmente en Medellín, donde se concentra alrededor del $66 \%$ de los casos. Por esta razón, se decide pronosticar el número de hurtos en esta ciudad.
 
@@ -133,8 +130,29 @@ La literatura revisada establece que, a un mes, los métodos con modelo superan 
 | @medina2017 (arbitrada) | Colombia, hurto de vehículos asegurados, datos de Fasecolda 2006--2012 | Binomial negativa para la frecuencia mensual, severidad continua, Montecarlo | Un mes | VaR al 95 % | Bogotá y Medellín con la mayor pérdida esperada; sin validación fuera de muestra |
 | @rodriguez2018 (arbitrada, institucional) | Colombia, registros SIEDCO y SPOA y denuncia virtual | Comparación de registros con fuentes alternativas | No reporta | No reporta | La integración de 2017 aumentó las cifras registradas sin que necesariamente aumentara el delito |
 
-
 # Marco Teorico
+
+
+
+
+```{r}
+# 2. Identificar diferenciación (d) y patrones de ACF/PACF
+res_id <- identificar_modelo(trans_medallo, rezagos = 24)
+res_id$tabla_df
+res_id$tabla_corr
+
+# 3. Seleccionar candidatos automáticamente según la ACF y PACF
+res_comp <- seleccionar_candidatos(
+  y = trans_medallo,
+  d = res_id$d,
+  graficar = TRUE
+)
+res_comp$tabla
+
+```
+
+
+
 
 
 # Referencias
