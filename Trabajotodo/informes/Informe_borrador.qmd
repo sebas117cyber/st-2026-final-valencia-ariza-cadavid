@@ -132,9 +132,6 @@ La literatura revisada establece que, a un mes, los métodos con modelo superan 
 
 # Marco Teorico
 
-
-
-
 ```{r}
 # 2. Identificar diferenciación (d) y patrones de ACF/PACF
 res_id <- identificar_modelo(trans_medallo, rezagos = 24)
@@ -150,10 +147,6 @@ res_comp <- seleccionar_candidatos(
 res_comp$tabla
 
 ```
-
-
-
-
 
 # Referencias
 

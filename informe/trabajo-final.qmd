@@ -84,9 +84,9 @@ Julián Esteban Ariza Caro · Andres Felipe Cadavid Sanguino · Sebastián Valen
 
 La serie es el número mensual de hurtos de automóviles (artículo 239 del Código Penal, modalidad automotores) denunciados a la Policía Nacional en Medellín, según la fecha del hecho. Los registros provienen del SIEDCO de la DIJIN y se publican en datos abiertos [@policia2026]; la serie mensual se obtiene con código en R contando los registros de cada mes. El conjunto de Antioquia cubre de enero de 2010 a julio de 2026 y suma 28 403 hurtos de automóviles, cifra que coincide con el total del portal; 18 824 de ellos ocurrieron en Medellín.
 
-Al explorar la base de datos se observa que la mayoría de los hurtos de automotores del departamento ocurren en el Valle de Aburrá, y que Medellín concentra el 66 % de ellos entre 2011 y 2025. Por esta razón se pronostica la serie de la ciudad.
+Al explorar la base de datos se observa que la mayoría de los hurtos de automotores del departamento ocurren en el Valle de Aburrá, y que Medellín concentra el 66 % de ellos entre 2010 y 2025. Por esta razón se pronostica la serie de la ciudad.
 
-La muestra va de enero de 2011 a `r mes_texto(max(serie$mes))`, con $T = `r nrow(serie)`$ meses y `r fmt(sum(serie$hurtos))` hurtos. El año 2010 queda fuera porque parece incompleto (815 hurtos, frente a 2 001 en 2011), y los meses de 2026 porque la fuente aún consolida sus cifras; el informe está parametrizado por la fecha de corte para extender la muestra cuando se consoliden.
+La muestra va de enero de 2010 a `r mes_texto(max(serie$mes))`, con $T = 199$ meses y `r fmt(sum(serie$hurtos))` hurtos. Los meses de 2026 quedan fuera porque la fuente aún consolida sus cifras; el informe está parametrizado por la fecha de corte para extender la muestra cuando se consoliden.
 
 El nivel cambia por tramos: en promedio, entre 138 y 167 hurtos por mes en 2011–2013, entre 72 y 99 en 2014–2021, entre 86 y 92 en 2022–2024 y 77 en 2025. Hay meses atípicos: septiembre, noviembre y diciembre de 2012 (92, 54 y 61 hurtos, frente a 148 en octubre de 2012 y 187 en enero de 2013, una caída que sugiere un problema de registro) y abril de 2020 (21 hurtos, por el aislamiento obligatorio). Hay además dos cambios de nivel candidatos: la caída de 2014 y el aumento de 2017, año en que la integración de los registros de la Policía y la Fiscalía y la denuncia virtual restaron comparabilidad a la serie [@rodriguez2018]. La estacionalidad es débil; la sección de solución la cuantifica.
 
@@ -364,9 +364,8 @@ $$
 donde el modelo 1 es el anidado; se rechaza la igualdad de error cuadrático medio a favor del modelo grande si el estadístico $t$ de la media de $\hat f$, con error estándar robusto a autocorrelación, supera 1,645 [@clark2006, sec. 2, ec. (2.1)].
 
 
-# Exploracion inicial de la serie
+# Exploracion de la serie y análisis
 
-<!-- [Grafico inicial de la serie Medellin](../Trabajotodo/figs/Grafi_original_medallo.png){width="100%"} -->
 
 ```{r, include=FALSE}
 
@@ -504,43 +503,52 @@ La ACF decae rápidamente después del primer rezago y repunta en el rezago 12, 
 
 ```{r, include=FALSE}
 
-source("../Trabajotodo/R/06-Funciones_Dif_Comp_2.0.R")
+source("../Trabajotodo/R/06-Funciones_Dif_Comp_3.0.R")
 
 ```
 
-
-```{r, echo=FALSE}
-
+```{r, include=FALSE}
 # 2. Identificar diferenciación (d) y patrones de ACF/PACF
-res_id <- identificar_modelo(trans_medallo, rezagos = 24)
-# res_id$tabla_df
-# res_id$tabla_corr
-
-```
+res_id <- identificar_modelo(trans_medallo, rezagos = 24, graficar = FALSE)
 
 
-```{r}
-res_id$tabla_df
 
 ```
 
 ```{r, include=FALSE}
 
+res_id$tabla_df
+
+```
+
+
+| d | Estadistico.DF | Critico.5pct | Varianza | Decision |
+|:---|---|---|---|---:|
+| 0 | -8.3898 | -2.88 | 0 | Estacionaria |
+
+: Evaluacion Dickey-Fuller  {#tbl-DickeyFuller}
+
+Ya trabajando con la serie ya transformada, vamos a comprobar si se requiere diferenciar, para ello hacemos la prueba de $Dickey-Fuller$.
+
+El estadístico obtenido es de $-8.3898$, el cual es menor al valor crítico del $5\%$ ($-2.88$). Por lo tanto, se rechaza la hipótesis nula ($H_0$) de raíz unitaria y se concluye que la serie transformada ya es estacionaria, por lo que no necesita diferenciación ($d = 0$).
+
+
+```{r seleccion_candidatos, results='asis', echo=FALSE}
+# Selección de modelos candidatos guiada por ACF, PACF y ASACF
 res_comp <- seleccionar_candidatos(
   y = trans_medallo,
   d = res_id$d,
-  graficar = TRUE
+  mostrar_asacf = TRUE,
+  graficar = FALSE,
+  usar_kable = TRUE
 )
 
-
 ```
 
-```{r, echo=FALSE}
 
-res_comp$tabla
 
-```
 
+Como se puede ver en la tabla de modelos candidatos para pronosticar la serie de hurtos de Vehiculos en Medellín teniendo en cuenta la ACF, la PACF y la ASACF. El mejor modelo sería $\text{SARIMA(1,0,1)(1,0,0)[12]}$ ya que tiene el menor valor de BIC, y AIC a comparación de los otros modelos propuestos, aunque podriamos utilizar el modelo $\text{ARMA(1,1)}$ ya que tiene un parametro menos.
 
 # Referencias
 
