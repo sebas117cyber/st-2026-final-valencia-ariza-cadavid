@@ -452,6 +452,54 @@ De acuerdo con la metodología de Box-Jenkins, el patrón conjunto de una ACF co
 La ACF tiene un patro de decrecimiento en un principio lento y decae rapidamente despues del rezago 5. Dando una posibilidad de tendencia, no tiene patron de estacionalidad. La PACF se corta en el rezago 3 antes de hacer ruido blanco proponiendo un posible modelo AR(3).
 
 
+## Tranformacion de los datos
+
+```{r, echo=FALSE}
+
+source("../Trabajotodo/R/05-boxcox.R")
+
+```
+
+
+```{r, include=FALSE}
+
+boxcox_medallo <- evaluar_boxcox(serie_ts_med)
+
+ST_transMedallo <- boxcox_medallo$serie_transformada
+
+trans_medallo <- leer_serie(ST_transMedallo, 
+                            fuente = "datos abiertos col",
+                            unidad = "robos reportados de vehiculos")
+
+```
+| Parámetro | Valor |
+|:---|---:|
+| Lambda óptimo estimado | -0.9793 ≈ -1 |
+
+: Evaluación de Box-Cox {#tbl-boxcox}
+
+
+```{r, echo=FALSE}
+
+G_transM <- graficar_serie(trans_medallo, "Serie tranformada: Robos de vehiculos en medellin 2010-2026")
+
+G_transM
+
+```
+
+
+```{r, echo=FALSE}
+
+Cor_transM <- correlograma(trans_medallo, m = 24)
+Cor_transM$panel
+
+```
+
+
+La transformación de Box-Cox arrojó un λ óptimo de -0.9793, equivalente prácticamente a una transformación recíproca (1/y), lo que confirma que la varianza crece con el nivel de la serie. Tras la transformación se redujo la dispersión del periodo 2011-2013, pero se amplificó el efecto de los valores bajos, en particular el de abril de 2020. La transformación no elimina el cambio de nivel, por lo que la serie sigue sin ser estacionaria en media y requiere diferenciación en la etapa de identificación de Box-Jenkins.
+
+La ACF decae rápidamente después del primer rezago y repunta en el rezago 12, lo que sugiere una estacionalidad débil. Por su parte, la PACF se corta a partir del primer rezago, aunque los rezagos 1 y 2 están en el límite de la banda de significancia.
+
 # Referencias
 
 ::: {#refs}

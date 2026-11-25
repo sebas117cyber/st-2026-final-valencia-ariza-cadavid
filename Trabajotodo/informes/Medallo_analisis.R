@@ -58,6 +58,7 @@ G_originalM <- graficar_serie(serie_med, "Reporte de Robos de vehiculos en medel
 Cor_originalM <- correlograma(serie_med, m = 24)
 
 
+
 boxcox_medallo <- evaluar_boxcox(serie_ts_med)
 
 ST_transMedallo <- boxcox_medallo$serie_transformada
@@ -85,3 +86,32 @@ res_comp <- seleccionar_candidatos(
   graficar = TRUE
 )
 res_comp$tabla
+
+#----Modelos segun las funciones de paquetes----
+
+lambda <- -0.9793
+fit_bc  <- auto.arima(ST_transMedallo, lambda = lambda, biasadj = TRUE)
+fit_log <- auto.arima(ST_transMedallo, lambda = 0,      biasadj = TRUE)
+fit_raw <- auto.arima(ST_transMedallo)
+
+
+fit_OGbc <- auto.arima(serie_ts_med, lambda = lambda, biasadj = TRUE)
+# 2. Atípicos
+tsoutliers(ST_transMedallo)
+
+# 3. Estacionariedad y estacionalidad
+ndiffs(BoxCox(ST_transMedallo, lambda)); nsdiffs(BoxCox(ST_transMedallo, lambda))
+
+adf.test(diff(BoxCox(ST_transMedallo, lambda))); kpss.test(diff(BoxCox(ST_transMedallo, 
+                                                                       lambda)))
+
+ggseasonplot(ST_transMedallo); ggAcf(diff(BoxCox(ST_transMedallo, lambda)), lag.max = 36)
+
+# 4. Subperiodo estable
+serie_est <- window(ST_transMedallo, start = c(2026, 1))
+BoxCox.lambda(serie_est)
+
+# 5. Validación fuera de muestra
+accuracy(forecast(fit_bc, h = 12), test_set)
+
+
